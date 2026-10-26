@@ -125,8 +125,10 @@ About 60 ms for a 6.5 MP EOS file and 70 ms for the 7.4 MP G6 in release mode on
 ## Origin
 
 The decoder was written in LightCraft as `crates/raw/src/vendor/crw.rs` and `crw_tables.rs`
-(branch `clean-room-crw-format-decode`, revision `70c755e42a65661401142819278d51b0c5977f7f`,
-[storytold/lightcraft](https://github.com/storytold/lightcraft)) and moved here with its tests and
+(branch `clean-room-crw-format-decode`, revision `6ca439b5155820d2befeacd81ec0c6a80b2bd3bc`,
+[storytold/lightcraft](https://github.com/storytold/lightcraft); the decoder itself was ported at
+`70c755e4`, and the branch's later review commits changed only a date conversion that is not part
+of this crate) and moved here with its tests and
 its derivation record. The move replaced LightCraft's types with this crate's own (`Error`,
 `Limits`, `Cfa`, `Rect`, `BlackLevel`, `Header`, `Image`), exposed the capture time as Unix
 seconds instead of converting it in the decoder, and copied LightCraft's shared plateau estimate

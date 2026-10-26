@@ -2,7 +2,7 @@
 
 Everything that establishes how `craft-crw` decodes a CRW, in the order it happened. The record was
 produced in LightCraft (`clean-room/crw/`, branch `clean-room-crw-format-decode`, revision
-`70c755e42a65661401142819278d51b0c5977f7f`) between 2026-10-12 and 2026-10-25 and moved here
+`6ca439b5155820d2befeacd81ec0c6a80b2bd3bc`; the record is identical at `70c755e4`, where the decoder was ported) between 2026-10-12 and 2026-10-25 and moved here
 **verbatim** when the decoder became this shared crate. The documents are the evidence: they are
 not rewritten after the fact, so paths they mention are LightCraft's paths of that time (the
 mapping is below), and `00-starting-assumptions.md` is committed once and never edited.
