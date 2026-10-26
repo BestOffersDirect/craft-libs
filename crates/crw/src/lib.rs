@@ -60,18 +60,14 @@ pub enum Error {
 #[non_exhaustive]
 pub struct Limits {
     /// Most sensor samples (`width × height`) a file may declare. The decoder holds about three
-    /// `u16` buffers of this size at its peak. Default: 2³⁰ on 64-bit targets, 2²⁶ on 32-bit
-    /// ones (wasm32). Real CRW frames hold at most 7.4 million samples.
+    /// `u16` buffers of this size at its peak. Default: 2²³ (8.4 million) on every target; real
+    /// CRW frames hold at most 7.4 million samples.
     pub max_samples: usize,
 }
 
 impl Default for Limits {
     fn default() -> Self {
-        #[cfg(target_pointer_width = "64")]
-        let max_samples = 1 << 30;
-        #[cfg(not(target_pointer_width = "64"))]
-        let max_samples = 1 << 26;
-        Self { max_samples }
+        Self { max_samples: 1 << 23 }
     }
 }
 

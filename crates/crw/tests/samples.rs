@@ -220,6 +220,8 @@ fn oracle_tiffs_match_every_sample() {
         };
         let (w, h, oracle) = oracle_samples(&std::fs::read(reference).expect("read oracle tiff"));
         assert_eq!((img.header.width, img.header.height), (w, h), "{name}: dimensions");
+        assert_eq!(oracle.len(), w * h, "{name}: oracle sample count");
+        assert_eq!(img.samples.len(), w * h, "{name}: decoded sample count");
         let mismatches = img.samples.iter().zip(&oracle).filter(|(a, b)| a != b).count();
         assert_eq!(mismatches, 0, "{name}: {mismatches} mismatching samples");
         eprintln!("{name}: EXACT ({w}x{h})");

@@ -27,9 +27,9 @@ RawData (CIFF record 0x2005), with w×h from SensorInfo (0x1031) and
 
 - **Low-bits plane**: 2 bits per sensor sample, row-major, LSB-first within each byte
   (sample 4i in bits 1:0 … sample 4i+3 in bits 7:6). Present ⇔ either
-  (a) the first w·h/4 + 514 bytes of the payload contain any 0xff byte NOT followed by
+  (a) the first ⌈w·h/4⌉ + 514 bytes of the payload contain any 0xff byte NOT followed by
   0x00 (the entropy stream is always stuffed, the low-bits plane is raw), or
-  (b) the 514 bytes at offset w·h/4 are all zero (the zero header sits right after the
+  (b) the 514 bytes at offset ⌈w·h/4⌉ are all zero (the zero header sits right after the
   plane; without a plane that offset is deep in entropy data).
   Rule (a) alone, the revision-1 rule, misses planes that hold no 0xff byte: some D60
   files have a lowest bit that is almost always 0 (low values 1 and 3 on about 0.04 % of

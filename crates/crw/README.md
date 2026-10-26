@@ -86,7 +86,7 @@ if craft_crw::probe(&bytes) {
 code), `Unsupported(String)` (an unknown decoder table, or the PowerShot G5) or
 `LimitExceeded(&str)`. Every offset read from the file is bounds-checked, the heap walk is bounded
 by depth (16) and by a per-file record budget (4,096), and `width × height` is checked against
-`Limits::max_samples` (default 2³⁰ on 64-bit targets, 2²⁶ on wasm32; real frames hold at most
+`Limits::max_samples` (default 2²³, about 8.4 million, on every target; real frames hold at most
 7.4 million) before anything is allocated. The decoder holds about three sample-sized `u16`
 buffers at its peak. `Limits` is `#[non_exhaustive]`: start from `Limits::default()` and set the
 fields you change.
