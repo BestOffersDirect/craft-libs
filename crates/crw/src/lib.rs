@@ -356,7 +356,6 @@ fn parse(bytes: &[u8], limits: &Limits, full: bool) -> Result<Image> {
     let has_low = header_after_plane || head.windows(2).any(|p| p[0] == 0xff && p[1] != 0x00);
     let bits = if has_low { 12 } else { 10 };
     let low_len = if has_low { q } else { 0 };
-
     let samples = if full {
         let entropy = payload.get(low_len.saturating_add(ent_off)..).ok_or_else(|| corrupt("payload shorter than its header"))?;
         let low = has_low.then(|| payload.get(..q)).flatten();
