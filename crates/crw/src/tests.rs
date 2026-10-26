@@ -99,22 +99,42 @@ fn encode_hi(hi: &[u16], w: usize, t: &tables::SelTables) -> Vec<u8> {
             bits.extend((0..s).rev().map(|i| (m >> i) & 1 == 1));
         }
     }
-    let mut bytes = Vec::new();
+    pack_entropy(&bits)
+}
+
+/// MSB-first packing into bytes, zero padding in the last byte, then ff00 stuffing.
+fn pack_entropy(bits: &[bool]) -> Vec<u8> {
+    let mut stuffed = Vec::new();
     for chunk in bits.chunks(8) {
         let mut b = 0u8;
         for (i, &bit) in chunk.iter().enumerate() {
             b |= (bit as u8) << (7 - i);
         }
-        bytes.push(b);
-    }
-    let mut stuffed = Vec::new();
-    for b in bytes {
         stuffed.push(b);
         if b == 0xff {
             stuffed.push(0x00);
         }
     }
     stuffed
+}
+
+/// One end-of-block token pair per 64-sample block: the block's first sample takes the carry
+/// (zero here), the other 63 keep their chain values. A flat frame like this compresses to a
+/// small fraction of its low-bits plane, the shape a lens-cap or blown-out frame has.
+fn encode_eob(n: usize, t: &tables::SelTables) -> Vec<u8> {
+    let code = |tab: &[(u16, u8, u8, u8)]| {
+        let &(c, l, ..) = tab.iter().find(|e| e.2 == 0 && e.3 == 0).expect("an end-of-block code");
+        (c, l)
+    };
+    let (fc, fl) = code(t.first);
+    let (mc, ml) = code(t.main);
+    let mut bits: Vec<bool> = Vec::new();
+    for _ in 0..n.div_ceil(64) {
+        for (c, l) in [(fc, fl), (mc, ml)] {
+            bits.extend((0..l).rev().map(|i| (c >> i) & 1 == 1));
+        }
+    }
+    pack_entropy(&bits)
 }
 
 /// A high plane whose diffs are all nonzero, bounded around 512: values follow
@@ -130,6 +150,22 @@ fn payload(low: Option<&[u8]>, entropy: &[u8]) -> Vec<u8> {
     p.extend_from_slice(entropy);
     p.extend_from_slice(&[0, 0]);
     p
+}
+
+/// The real PowerShot record shape: the payload closes with `ff d9` and a pad byte, not `00 00`.
+fn payload_with_trailer(low: Option<&[u8]>, entropy: &[u8]) -> Vec<u8> {
+    let mut p = low.map(|l| l.to_vec()).unwrap_or_default();
+    p.extend_from_slice(&[0; 514]);
+    p.extend_from_slice(entropy);
+    p.extend_from_slice(&[0xff, 0xd9, 0x00]);
+    p
+}
+
+/// A file whose raw record is `payload` verbatim, with `extra` records beside the usual three.
+fn file_with_payload(w: u16, h: u16, model: &str, payload: &[u8], extra: &[(u16, Vec<u8>)], o: Order) -> Vec<u8> {
+    let mut props = vec![(SENSOR_INFO, sensor_info(w, h, None, o)), (DECODER_TABLE, decoder_table(0, o)), (MAKE_MODEL, make_model(model))];
+    props.extend_from_slice(extra);
+    ciff(&[(RAW_DATA, payload.to_vec()), (0x300a, heap(&props, o))], o)
 }
 
 fn make_model(model: &str) -> Vec<u8> {
@@ -458,22 +494,17 @@ fn white_balance_comes_from_the_shot_info_slot() {
 fn rotation_maps_to_exif_orientation_and_the_time_stamp_is_unix_seconds() {
     let o = Order::Le;
     let hi = test_hi(128);
-    let image_info: Vec<u8> = [3072u32, 2048, 0, 270, 12, 12, 0].iter().flat_map(|&v| put32(v, o)).collect();
-    let props = heap(
-        &[
-            (SENSOR_INFO, sensor_info(16, 8, None, o)),
-            (DECODER_TABLE, decoder_table(0, o)),
-            (MAKE_MODEL, make_model("Canon EOS 300D DIGITAL")),
-            (IMAGE_INFO, image_info),
-            (TIME_STAMP, [1083410638u32, 0, 0].iter().flat_map(|&v| put32(v, o)).collect()),
-        ],
-        o,
-    );
     let tables = tables::tables(0).expect("selector 0");
-    let f = ciff(&[(RAW_DATA, payload(None, &encode_hi(&hi, 16, &tables))), (0x300a, props)], o);
-    let img = full(&f).expect("decodes");
-    assert_eq!(img.header.exif_orientation, 8);
-    assert_eq!(img.header.capture_unix, Some(1083410638));
+    // The record holds a signed degree count, so 270 may also be written as −90.
+    for (deg, want) in [(0u32, 1u8), (90, 6), (180, 3), (270, 8), (-90i32 as u32, 8), (-270i32 as u32, 6)] {
+        let image_info: Vec<u8> = [3072u32, 2048, 0, deg, 12, 12, 0].iter().flat_map(|&v| put32(v, o)).collect();
+        let stamp: Vec<u8> = [1083410638u32, 0, 0].iter().flat_map(|&v| put32(v, o)).collect();
+        let extra = [(IMAGE_INFO, image_info), (TIME_STAMP, stamp)];
+        let f = file_with_payload(16, 8, "Canon EOS 300D DIGITAL", &payload(None, &encode_hi(&hi, 16, &tables)), &extra, o);
+        let img = full(&f).expect("decodes");
+        assert_eq!(img.header.exif_orientation, want, "rotation {deg}");
+        assert_eq!(img.header.capture_unix, Some(1083410638));
+    }
 }
 
 #[test]
@@ -525,6 +556,106 @@ fn self_referencing_sub_heaps_terminate() {
         walk(&f, 26, len as usize, o, 0, &mut budget, &mut rec);
         assert_eq!(budget, 0);
         assert!(rec.is_empty());
+    }
+}
+
+/// A no-plane G1 frame that compresses well closes with the record's real `ff d9 00` trailer and
+/// is still shorter than plane + header — the shape of a lens-cap or blown-out frame. Rule (a)
+/// read that `ff d9` as a plane byte, reported 12 bits and then refused the file.
+#[test]
+fn a_short_powershot_payload_closing_with_the_trailer_has_no_plane() {
+    let o = Order::Le;
+    let (w, h) = (64u16, 64u16);
+    let n = w as usize * h as usize;
+    let tables = tables::tables(0).expect("selector 0");
+    let entropy = encode_eob(n, &tables);
+    let p = payload_with_trailer(None, &entropy);
+    let span = n.div_ceil(4) + 514;
+    assert!(p.len() < span, "the payload must be shorter than plane + header: {} vs {span}", p.len());
+    assert!(p.windows(2).any(|q| q[0] == 0xff && q[1] != 0x00), "the trailer is the unstuffed ff pair");
+
+    let f = file_with_payload(w, h, "Canon PowerShot G1", &p, &[], o);
+    let hdr = header(&f, &Limits::default()).expect("header");
+    assert_eq!(hdr.bits, 10, "the trailer is not a low-bits plane");
+    // Every block is one end-of-block token, so the chain values stand (512 at each row start):
+    // the frame decodes instead of being refused for a plane it does not have.
+    let img = full(&f).expect("decodes");
+    assert_eq!((img.header.bits, img.samples.iter().filter(|&&v| v == 512).count()), (10, n));
+
+    // The same frame without the trailer was already read as 10-bit.
+    let f = file_with_payload(w, h, "Canon PowerShot G1", &payload(None, &entropy), &[], o);
+    assert_eq!(header(&f, &Limits::default()).expect("header").bits, 10);
+}
+
+/// An end-of-block token at the head of a block emits the carry and leaves the other 63 samples
+/// at their chain values: the runs the sample hashes cover, on a file the unit tests can read.
+#[test]
+fn end_of_block_keeps_the_chain_values() {
+    let o = Order::Le;
+    let (w, h) = (64u16, 64u16);
+    let n = w as usize * h as usize;
+    let tables = tables::tables(0).expect("selector 0");
+    let f = file_with_payload(w, h, "Canon EOS D30", &payload(None, &encode_eob(n, &tables)), &[], o);
+    let img = full(&f).expect("decodes");
+    assert_eq!(img.samples.len(), n);
+    assert!(img.samples.iter().all(|&v| v == 512), "every sample keeps its row's chain value");
+}
+
+/// Zero sensor dimensions are damage, not a request for too much memory.
+#[test]
+fn zero_sensor_dimensions_are_corrupt_not_a_limit() {
+    let f = roundtrip_file(0, 0, "Canon EOS D60", None, &[], Order::Le);
+    assert!(matches!(full(&f), Err(Error::Corrupt(_))));
+    assert!(matches!(header(&f, &Limits::default()), Err(Error::Corrupt(_))));
+}
+
+/// A hostile stream can run the chain past the bit depth (here a "10-bit" body writing 1535).
+/// `samples` is documented as `bits` deep, so the surplus never reaches a `1 << bits` LUT.
+#[test]
+fn samples_are_clamped_to_the_declared_depth() {
+    let f = roundtrip_file(2, 1, "Canon PowerShot G1", None, &[512, 1535], Order::Le);
+    let img = full(&f).expect("decodes");
+    assert_eq!((img.header.bits, img.samples.as_slice()), (10, &[512u16, 1023][..]));
+    // the 12-bit merge of the same chain cannot leave 0..=4095 either
+    let low = vec![0xffu8; 1];
+    let f = roundtrip_file(2, 1, "Canon EOS D60", Some(&low), &[512, 1535], Order::Le);
+    let img = full(&f).expect("decodes");
+    assert_eq!(img.header.bits, 12);
+    assert!(img.samples.iter().all(|&v| v <= 4095), "{:?}", img.samples);
+}
+
+/// The two ColorBalance layouts and every Canon setting that picks a slot. Every corpus file is
+/// set to Auto, so a wrong arm would still pass on the samples alone.
+#[test]
+fn white_balance_slot_arms_follow_the_camera_setting() {
+    let o = Order::Le;
+    // Quadruple k is (100+k, 200, 200, 300+k): the multipliers name the slot chosen, and the last
+    // quadruple is black levels, which is never a slot.
+    let wb = |usable: u16, setting: u16| {
+        let mut vals = vec![(usable + 1) * 8];
+        for k in 0..=usable {
+            vals.extend([100 + k, 200, 200, 300 + k]);
+        }
+        let mut bytes: Vec<u8> = vals.iter().flat_map(|&v| put16(v, o)).collect();
+        let cb_len = bytes.len();
+        let si_off = bytes.len();
+        let mut shot = [0u16; 8];
+        shot[7] = setting;
+        bytes.extend(shot.iter().flat_map(|&v| put16(v, o)));
+        let mut rec = BTreeMap::new();
+        rec.insert(COLOR_BALANCE, (0usize, cb_len));
+        rec.insert(SHOT_INFO, (si_off, 16usize));
+        wb_from_color_balance(&bytes, &rec, o)
+    };
+    let expect = |k: u16| Some([(100 + k) as f32 / 200.0, 1.0, (300 + k) as f32 / 200.0]);
+    // 10D/300D: Auto, Daylight, Shade, Cloudy, Tungsten, Fluorescent, Flash, Custom, Kelvin
+    for (setting, slot) in [(0u16, 0u16), (1, 1), (8, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7), (9, 8), (7, 0)] {
+        assert_eq!(wb(9, setting), expect(slot), "nine-slot setting {setting}");
+    }
+    // D60: Auto, Daylight, Cloudy, Tungsten, Fluorescent, Flash, Custom. Shade and Kelvin have no
+    // slot of their own and fall back to Auto.
+    for (setting, slot) in [(0u16, 0u16), (1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (6, 6), (8, 0), (9, 0)] {
+        assert_eq!(wb(7, setting), expect(slot), "seven-slot setting {setting}");
     }
 }
 

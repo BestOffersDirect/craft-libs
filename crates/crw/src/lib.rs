@@ -114,6 +114,11 @@ impl Rect {
 }
 
 /// Black level per 2×2 CFA site, row-major, anchored at the active area's origin.
+///
+/// The anchor differs from [`Header::cfa`]'s: `cfa` is the phase at sensor (0, 0), `values` is
+/// indexed from the active area's origin. The active area can start at an odd sensor row (the
+/// PowerShot G1 starts at y = 15), so `values[i]` does not line up with `cfa.pattern()[i]`: read a
+/// level through [`BlackLevel::at`] rather than pairing the two by index.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BlackLevel {
     pub values: [f32; 4],
@@ -302,7 +307,10 @@ fn parse(bytes: &[u8], limits: &Limits, full: bool) -> Result<Image> {
         (Some(&w), Some(&h)) => (w as usize, h as usize),
         _ => return Err(corrupt("SensorInfo too short")),
     };
-    let n = w.checked_mul(h).filter(|&n| n > 0 && n <= limits.max_samples).ok_or(Error::LimitExceeded("image too large"))?;
+    if w == 0 || h == 0 {
+        return Err(corrupt("zero sensor dimensions"));
+    }
+    let n = w.checked_mul(h).filter(|&n| n <= limits.max_samples).ok_or(Error::LimitExceeded("image too large"))?;
 
     let &(dto, dtl) = rec.get(&DECODER_TABLE).ok_or_else(|| corrupt("no DecoderTable record"))?;
     if dtl < 16 {
@@ -352,8 +360,12 @@ fn parse(bytes: &[u8], limits: &Limits, full: bool) -> Result<Image> {
     let q = n.div_ceil(4);
     let span = q.saturating_add(ent_off);
     let head = payload.get(..span.min(payload.len())).unwrap_or(payload);
-    let header_after_plane = ent_off >= 64 && payload.len() > span && payload.get(q..span).is_some_and(|z| z.iter().all(|&b| b == 0));
-    let has_low = header_after_plane || head.windows(2).any(|p| p[0] == 0xff && p[1] != 0x00);
+    // Both signs need a payload long enough to hold a plane and the header behind it. A shorter
+    // payload ends in the PowerShot `ff d9 00` trailer, and `ff d9` is a 0xff not followed by
+    // 0x00: without this gate a flat no-plane G1 frame read as 12-bit and was then refused.
+    let plane_fits = payload.len() > span;
+    let header_after_plane = plane_fits && ent_off >= 64 && payload.get(q..span).is_some_and(|z| z.iter().all(|&b| b == 0));
+    let has_low = header_after_plane || (plane_fits && head.windows(2).any(|p| p[0] == 0xff && p[1] != 0x00));
     let bits = if has_low { 12 } else { 10 };
     let low_len = if has_low { q } else { 0 };
     let samples = if full {
@@ -364,13 +376,17 @@ fn parse(bytes: &[u8], limits: &Limits, full: bool) -> Result<Image> {
         }
         let hi = decode_entropy(entropy, w, h, &tables)?;
         let mut samples = vec![0u16; n];
+        // `samples` is documented as `bits` deep, so a damaged stream whose chain value runs past
+        // the range is clamped here: a consumer indexing a `1 << bits` LUT must not see more.
+        let top = ((1u32 << bits) - 1) as u16;
         for (i, (dst, &hi)) in samples.iter_mut().zip(hi.iter()).enumerate() {
             *dst = match low {
                 Some(low) => {
                     let lb = low.get(i >> 2).map_or(0, |&b| (b >> ((i & 3) * 2)) & 3);
-                    ((((hi as u32) << 2) | lb as u32) & 0xffff) as u16
+                    let v = (((hi as u32) << 2) | lb as u32) & 0xffff;
+                    v.min(u32::from(top)) as u16
                 }
-                None => hi,
+                None => hi.min(top),
             };
         }
         samples
@@ -387,7 +403,11 @@ fn parse(bytes: &[u8], limits: &Limits, full: bool) -> Result<Image> {
 
     // ImageInfo rotation: degrees; 270 observed on portrait files whose scene is upright after a
     // 90° counter-clockwise turn (Exif 8), so 90 is its mirror (Exif 6)
-    let exif_orientation = match rec.get(&IMAGE_INFO).and_then(|&(io, il)| (il >= 16).then(|| u32_at(bytes, io + 12, o)).flatten()) {
+    // The record holds a signed degree count, so a file may write −90 for 270: take it modulo
+    // 360 before mapping, and leave anything off-axis (0, ±360) at the identity.
+    let rotation_deg =
+        rec.get(&IMAGE_INFO).and_then(|&(io, il)| (il >= 16).then(|| u32_at(bytes, io + 12, o)).flatten()).map(|r| (r as i32).rem_euclid(360));
+    let exif_orientation = match rotation_deg {
         Some(90) => 6,
         Some(180) => 3,
         Some(270) => 8,
