@@ -237,6 +237,18 @@ fn limits_cap_the_sample_count() {
     assert!(decode(&f, &limits).is_ok());
 }
 
+/// A header declaring 2²⁴ samples over a 128-sample stream is refused by the default limits
+/// before any sample-sized buffer exists: the cap must stay above every real frame (7.4 million)
+/// and below anything that would let a crafted file demand gigabytes.
+#[test]
+fn default_limits_refuse_a_crafted_giant_frame() {
+    let hi = test_hi(128);
+    let f = roundtrip_file(4096, 4096, "Canon EOS D60", None, &hi, Order::Le);
+    assert_eq!(decode(&f, &Limits::default()), Err(Error::LimitExceeded("image too large")));
+    assert_eq!(header(&f, &Limits::default()), Err(Error::LimitExceeded("image too large")));
+    assert!(Limits::default().max_samples >= 7_407_040, "the cap must admit the largest real frame");
+}
+
 #[test]
 fn g1_is_gbrg() {
     let hi = test_hi(128);
