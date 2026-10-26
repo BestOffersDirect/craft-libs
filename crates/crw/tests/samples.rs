@@ -1,6 +1,6 @@
 //! The CC0 sample files (raw.pixls.us) pinned in `samples.json`: each decodes to exactly the
 //! sensor samples the derivation verified against the black-box reference (`clean-room/
-//! 07-verification.md`), recorded as the SHA-256 of the little-endian sample buffer, with the
+//! 03-verification.md`), recorded as the SHA-256 of the little-endian sample buffer, with the
 //! levels, white balance and metadata the decoder read then.
 //!
 //! The files are not in the repository (5–11 MB each): `python scripts/fetch-crw-samples.py

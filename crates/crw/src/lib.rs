@@ -5,8 +5,8 @@
 //! The container rules come from Canon's published CIFF specification and ExifTool's prose tag
 //! documentation; the compression was derived from CC0 and maintainer-owned sample files by
 //! black-box analysis against a reference decoder's command-line output, frozen in
-//! `clean-room/06-crw-format.md` and verified sample-exact on 28 of 29 corpus files plus 1,516
-//! further EOS D60 files (`clean-room/07-verification.md`). The code tables are frozen data
+//! `clean-room/02-crw-format.md` and verified sample-exact on 28 of 29 corpus files plus 1,516
+//! further EOS D60 files (`clean-room/03-verification.md`). The code tables are frozen data
 //! (`tables`, generated from `clean-room/logs/table_sel{0,1,2}.json`). No other raw decoder's
 //! source was consulted; the whole derivation record is in the crate's `clean-room/` folder.
 //!
@@ -326,7 +326,7 @@ fn parse(bytes: &[u8], limits: &Limits, full: bool) -> Result<Image> {
         .unwrap_or_default();
     if model.contains("PowerShot G5") {
         return Err(Error::Unsupported(
-            "Canon PowerShot G5 entropy coding (a documented anomaly of the derivation, clean-room/06-crw-format.md §4); use the embedded JPEG"
+            "Canon PowerShot G5 entropy coding (a documented anomaly of the derivation, clean-room/02-crw-format.md §4); use the embedded JPEG"
                 .into(),
         ));
     }
@@ -622,7 +622,7 @@ fn build_lut(codes: &[(u16, u8, u8, u8)]) -> Vec<u32> {
 }
 
 /// Decode the ff00-stuffed entropy stream into the `w × h` high-plane samples, per the frozen
-/// model (`clean-room/06-crw-format.md` §2): 64-sample blocks, first/main code tables,
+/// model (`clean-room/02-crw-format.md` §2): 64-sample blocks, first/main code tables,
 /// (run, size) leaves with JPEG-rule magnitudes, EOB, block-DC carry, and two parity DPCM chains
 /// initialised to 512 and reset at every row start. A stream that ends early leaves the remaining
 /// samples at their chain values (the frozen stream-end rule).

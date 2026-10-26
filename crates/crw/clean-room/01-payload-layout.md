@@ -1,10 +1,10 @@
 # CRW RawData payload layout (P1) — established by statistics, no decoding
 
-Status: derived 2026-10-12 from the 29-file corpus by `p1_payload.py`, `p1b_markers.py`,
-`p1c_lowbits_bounds.py` (logs: `logs/p1-*.txt`, `logs/p1b-*.txt`, `logs/p1c-*.txt`, private
-counterparts under `logs/private/`). **The entropy-coded bitstream itself has not been decoded;**
-everything here comes from sizes, offsets, byte histograms and ff-digram statistics.
-Assumption IDs refer to `00-starting-assumptions.md`; corrections are stated explicitly.
+Status: derived 2026-10-12 from the 29-file corpus by statistics alone. The scripts that produced
+it (`p1_payload.py`, `p1b_markers.py`, `p1c_lowbits_bounds.py`) and their logs are not part of
+this record. **The entropy-coded bitstream itself has not been
+decoded;** everything here comes from sizes, offsets, byte histograms and ff-digram statistics.
+Corrections are stated against the starting assumptions, by their labels (B2, B3, …).
 
 ## 1 The three layouts
 
@@ -17,7 +17,7 @@ dimensions, Q = ⌈w·h/4⌉ (one byte per four pixels — the "low-bits" region
 | PowerShot 12-bit: G5, G6 | `[514 zero bytes][low bits, Q][stuffed entropy][ff d9 (+00)]` | S−L = 2; first 514 bytes zero; **all** non-stuffed ff (5002 of 5002 on G5, 7928 of 7928 on G6) fall inside [514, 514+Q); the rest of the stream is perfectly stuffed; payload ends `ff d9` |
 | PowerShot 10-bit: G1 | `[514 zero bytes][stuffed entropy][ff d9 + 00]` | S−L = 3; first 514 bytes zero; zero non-stuffed ff anywhere; payload ends `ff d9 00` |
 
-Private corpus: all 18 D60 files match the EOS row exactly (`logs/private/p1c-bounds-private.txt`).
+Private corpus: all 18 D60 files match the EOS row exactly.
 
 ## 2 DecoderTable (0x1835) semantics
 
@@ -47,7 +47,7 @@ Private corpus: all 18 D60 files match the EOS row exactly (`logs/private/p1c-bo
 - Extent Q = w·h/4 exactly, in all 25 files that have the region (B6's arithmetic holds).
 - D60-class prefix: reshaped at w/4 = 788 bytes/row, the first **7 rows are exactly zero**
   (5516 = 7×788 bytes) in the public D60 file, and the leading zero run is row-aligned —
-  strong evidence the region is row-major at 2 bits/pixel (`logs/p1-payload-public.txt`).
+  strong evidence the region is row-major at 2 bits/pixel.
   Below the crop-top band the bytes are near-uniform (entropy ≈ 7.99), as LSB noise should be.
 - D30's region is high-entropy from byte 0 and ends in a run of `ff` bytes (saturated LSBs?);
   no zero rows — the D30's masked rows evidently carry noise. Placement for D30 is supported
@@ -89,8 +89,7 @@ Private corpus: all 18 D60 files match the EOS row exactly (`logs/private/p1c-bo
 | g5 | 2672×1968 | 4 861 806 | 1 | 4 861 804 | 2 | 1 314 624 (inside L) | — | 514 |
 | g6 | 3160×2344 | 7 313 156 | 0 | 7 313 154 | 2 | 1 851 760 (inside L) | — | 514 |
 
-(S here is the RawData record size, not the file size. Private D60 table:
-`logs/private/p1-payload-private.txt`.)
+(S here is the RawData record size, not the file size.)
 
 ## 7 Open for P2 (entropy derivation)
 
@@ -102,5 +101,5 @@ Private corpus: all 18 D60 files match the EOS row exactly (`logs/private/p1c-bo
    explanation to fall out of the geometry work (P3).
 5. EOS tail `ff 00 00` vs `00 00` — settle when the stream end is decodable.
 
-P2 requires the approved oracle (LibRaw pre-built binary, run black-box; plan §5a decision 1–2)
-for probing and for the low-bits test. **Requested from the maintainer before P2 starts.**
+P2 requires the approved oracle (LibRaw pre-built binary, run black-box, per the plan the
+maintainer approved) for probing and for the low-bits test. **Requested from the maintainer before P2 starts.**

@@ -1,6 +1,6 @@
 # CRW decode verification (P4) — against LibRaw 0.22.2, zero tuning
 
-Method: the frozen model of `06-crw-format.md` plus the frozen tables
+Method: the frozen model of `02-crw-format.md` plus the frozen tables
 (`logs/table_sel{0,1,2}.json`) were run by the local Python reference decoder over every
 sample file, comparing **every sensor sample** (full values, low bits merged) against
 `unprocessed_raw.exe -T` output. "EXACT" means zero mismatching samples over the whole
@@ -8,8 +8,8 @@ frame. The table extraction itself consumed these same files (known-plaintext le
 so this is a consistency proof against the oracle, not a blind holdout; the cross-body
 sharing (tables learned on one body, exact on others) is the strongest independent check.
 
-Private files are the maintainer's own D60 photos (hashes in `01-plan.md` §2.2); only
-their verdicts are recorded here, never content.
+Private files are the maintainer's own D60 photos (hashes in `logs/private-corpus.tsv`);
+only their verdicts are recorded here, never content.
 
 ## Results
 
@@ -46,13 +46,13 @@ their verdicts are recorded here, never content.
 | `private/CRW_2219.crw` | 2 | 3152x2068 | **EXACT** |
 
 **28 of 29 files decode EXACT** — all 10 usable public CC0 files and all 18 private
-D60 files; the PowerShot G5 is the known exception (`06-crw-format.md` §4).
+D60 files; the PowerShot G5 is the known exception (`02-crw-format.md` §4).
 
 ## Notes
 
 - The final 1–3 samples of each frame follow the stream-end rule (chains persist);
   every "EXACT" verdict includes them.
-- PowerShot G5: see `06-crw-format.md` §4 — detected and excluded; embedded-JPEG
+- PowerShot G5: see `02-crw-format.md` §4 — detected and excluded; embedded-JPEG
   fallback until resolved.
 - The G1 (10-bit, no low-bits plane) verifies the low-bits presence rule; the G6
   (12-bit, different geometry, w not divisible by 64) verifies the row-reset and
@@ -62,7 +62,7 @@ D60 files; the PowerShot G5 is the known exception (`06-crw-format.md` §4).
 
 The maintainer supplied 1,516 Canon EOS D60 files (private; local use only, nothing
 copied into the repository, verdicts only recorded here). With the revision-1 decoder,
-223 failed on unseen code-table entries and 9 were misread as 10-bit (`06-crw-format.md`,
+223 failed on unseen code-table entries and 9 were misread as 10-bit (`02-crw-format.md`,
 revision 2). After the two corrections every file was compared against LibRaw 0.22.2
 `unprocessed_raw.exe -T`, every sensor sample, with the Rust decoder
 (`plan/crw/model/sweep_all.py`, local):

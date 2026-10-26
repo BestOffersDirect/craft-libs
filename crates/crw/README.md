@@ -14,7 +14,7 @@ tag documentation. The compression was never documented by Canon: it was **deriv
 maintainer-owned sample files, frozen, and verified sample-exact against a reference decoder's
 command-line output, treated as a black box. No raw-decoder source was consulted, at any point.
 The whole record is in [`clean-room/`](clean-room/README.md); the frozen format is
-[`clean-room/06-crw-format.md`](clean-room/06-crw-format.md).
+[`clean-room/02-crw-format.md`](clean-room/02-crw-format.md).
 
 ## What it decodes
 
@@ -29,7 +29,7 @@ The whole record is in [`clean-room/`](clean-room/README.md); the frozen format 
 | PowerShot G5 | 1 | **refused** | its entropy stream diverges from the model from sample 2056 on (`Error::Unsupported`); apps show the embedded JPEG |
 | PowerShot G2, G3, Pro1, Pro70, S30–S70 | | unverified | no CC0 samples exist; they decode through the same model if their records match, with no guarantee |
 
-"Exact" means every sensor sample equals the reference decode (`clean-room/07-verification.md`).
+"Exact" means every sensor sample equals the reference decode (`clean-room/03-verification.md`).
 Big-endian (`MM`) files are handled from the specification and tested synthetically; none has
 been seen in the wild. CHDK sensor dumps named `.CRW` are a different format and are not CIFF files
 (`probe` says no).
@@ -141,7 +141,7 @@ Colour (camera matrices, profiles, the JPEG-fitted look) stayed in LightCraft.
 `src/tables.rs` is generated data. Edit nothing by hand: the source of truth is
 `clean-room/logs/table_sel{0,1,2}.json`, and `python crates/crw/clean-room/tools/gen_tables.py`
 renders it (byte-identical to the committed file). A change to the tables is a change to the frozen
-format and must follow the reopening rule of `clean-room/06-crw-format.md`.
+format and must follow the reopening rule of `clean-room/02-crw-format.md`.
 
 ## Boundaries
 

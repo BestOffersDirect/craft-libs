@@ -25,7 +25,7 @@ vs −0.67 GRBG). Unsampled PowerShots default to RGGB, unverified.
 ## 2 Active area, black level, white level
 
 - **Active area**: SensorInfo (0x1031) values 5–8 are an inclusive crop (left, top, right,
-  bottom); valid on every corpus body (G5/G6 included). See `02-container.md` §3.
+  bottom); valid on every corpus body (G5/G6 included).
 - **Black level**: measured from the masked borders. Observed (oracle data, per body class):
   the left border is dark up to 8 columns before the active area on the EOS bodies
   (≈127–129 DN on D60/10D, ≈128 on D30, ≈124–127 on 300D) but transitions bright earlier on
@@ -105,8 +105,8 @@ vs −0.67 GRBG). Unsampled PowerShots default to RGGB, unverified.
   on all 10 decodable public corpus files, holdout RMS 0.009–0.043, including the D30 and
   the PowerShots, whose missing white balance the fitted matrix absorbs.
   **Update 2026-10-25:** the EOS D60 has dual-illuminant matrices of our own, fitted to
-  ColorChecker Classic shots under a tungsten bulb and direct sun (`10-chart-calibration.md`,
-  `crates/raw/src/chart_table.rs`). They give its white balance a Kelvin scale and are its
+  ColorChecker Classic shots under a tungsten bulb and direct sun (the fitting is part of
+  LightCraft's colour work, `crates/raw/src/chart_table.rs`). They give its white balance a Kelvin scale and are its
   colour when the JPEG fit fails; the look stays the JPEG fit. The other CRW bodies have none.
 
 ## 4 Orientation and capture time

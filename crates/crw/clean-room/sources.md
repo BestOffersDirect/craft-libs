@@ -48,7 +48,7 @@ checked out, diffed, logged or read.
 - 2026-10-12 19:28 — **Search** (WebSearch, standard): `Canon CIFF specification 1.0 rev 4 PDF
   "CIFF" camera image file format specification download`. Results included Wikipedia
   "Camera Image File Format", a freedesktop libopenraw wiki page "Canon CRW" (NOT opened — it is
-  a decoder project's page; left for the maintainer to approve, see plan §7), an unpkg mirror of
+  a decoder project's page; left for the maintainer to approve), an unpkg mirror of
   exiftool's canon_raw.html, PRONOM. Taken: pointer to Wikipedia for an archived spec URL.
   **No decoder algorithm details shown in the result snippets.**
 - 2026-10-12 19:28 — **Fetch attempt** `http://xyrion.org/ciff/` — failed (site dead).
@@ -86,22 +86,23 @@ checked out, diffed, logged or read.
   different format. **No decoder algorithm details shown.**
 - 2026-10-12 19:32 — **Download** (Python urllib, stdlib) the 11 CC0 files above from
   `https://raw.pixls.us/getfile.php/...` into the gitignored `corpus/crw/`; every file verified
-  against the site's published SHA-256 (all OK; table with hashes in `01-plan.md`).
+  against the site's published SHA-256 (all OK; the hashes are pinned in
+  `crates/crw/tests/samples.json`).
 
 ## Local analysis (scripts in this directory)
 
 - 2026-10-12 19:35–19:45 — `ciff_dump.py` (written here, stdlib only; container layout
-  implemented from the two documented sources above) run over the 11 public files
-  (`logs/structure-public.txt`) and the 18 private files
-  (`logs/private/structure-private.txt`, gitignored — may contain personal metadata). Observed
-  facts are summarised in `01-plan.md` §3. No raw-data decoding was attempted; statistics only.
-- 2026-10-12 ~20:0x — P0/P1 local analysis (post-approval): `02-container.md` written from the
+  implemented from the two documented sources above) run over the 11 public files and the 18
+  private files (whose dumps may contain personal metadata and are never committed). Observed
+  facts are summarised in `01-payload-layout.md`. No raw-data decoding was attempted; statistics
+  only. The script and its logs are not part of this record.
+- 2026-10-12 ~20:0x — P0/P1 local analysis (post-approval): the container notes written from the
   already-logged sources + corpus observations. `p1_payload.py`, `p1b_markers.py`,
-  `p1c_lowbits_bounds.py` run over all 29 files (public logs `logs/p1*`, private under
-  `logs/private/`). Established statistically (no decoding): the three payload layouts, the
+  `p1c_lowbits_bounds.py` run over all 29 files. Established statistically (no decoding): the
+  three payload layouts, the
   514-byte zero block at the compressed section start of every file, JPEG-style ff00 stuffing
   of every entropy stream (zero exceptions), the PowerShot `ff d9` terminator, and the exact
-  low-bits region bounds on G5/G6. Documented in `03-payload-layout.md`. No external sources
+  low-bits region bounds on G5/G6. Documented in `01-payload-layout.md`. No external sources
   consulted in this step.
 
 ## Oracle (P2, from 2026-10-12)
@@ -110,7 +111,8 @@ checked out, diffed, logged or read.
   a local `LibRaw-0.22.2\bin` folder. That directory tree also contains LibRaw's source
   code; **no source file there is ever opened, read or searched** — only
   `bin\unprocessed_raw.exe` is executed, as a black box, per the approved plan (§5a/§7).
-  All oracle runs and probe campaigns are logged in `04-derivation-log.md`.
+  All oracle runs and probe campaigns are logged in the derivation log, which is not part of this
+  record.
 
 - 2026-10-13 — **Fetch** `https://raw.pixls.us/json/getrepository.php?set=all` (and the site
   root to find that endpoint): recovered the stable `getfile.php` URLs of the 11 CC0 corpus
@@ -130,5 +132,5 @@ checked out, diffed, logged or read.
 - 2026-10-25 — **Fetch** `https://raw.githubusercontent.com/colour-science/colour/v0.4.2/colour/characterisation/datasets/colour_checkers/chromaticity_coordinates.py`
   (colour-science, BSD-3-Clause; also its rendered docs page): the 24 post-November-2014
   ColorChecker Classic L*a*b* values (D50), credited there to X-Rite's release. Reference
-  data only, the chart's measured colours; no camera or decoder content. Used in
-  `10-chart-calibration.md`.
+  data only, the chart's measured colours; no camera or decoder content. Used for the EOS D60
+  colour matrices.

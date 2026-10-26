@@ -7,9 +7,9 @@ sample-exact against LibRaw 0.22.2 `unprocessed_raw.exe -T`.
 
 | Set | Files | What it is | What it established |
 |---|---:|---|---|
-| `RawImages/` | 1,516 | Everyday photos, 2005–2014, all Auto white balance; ISO 100 (925), 200 (197), 400 (287), 800 (34), 1000 (73) | Freeze revision 2: two incomplete code tables and the plane-without-0xff case (`06-crw-format.md`); the low-ISO clip level (`08-color.md`); the D60 colour profile (`assets/camera-profiles/Canon_EOS_D60.json`, 1,424 usable photos) |
-| `Cap&WhiteOut/` | 4 | Lens cap and blown-out frames, ISO 100 and 1000 (2026-10-13) | Black level at ISO 100 matches the image area; at ISO 1000 the border reads about 4 DN high. Clip level about 4000 at ISO 100, 4095 at ISO 1000 (`08-color.md`) |
-| `WBModes/` | 7 | One overcast scene at Auto, Daylight, Cloudy, Tungsten, Fluorescent, Flash, Custom; ISO 100, within a minute (2026-10-14) | White-balance setting n uses ColorBalance slot n (`08-color.md`) |
+| `RawImages/` | 1,516 | Everyday photos, 2005–2014, all Auto white balance; ISO 100 (925), 200 (197), 400 (287), 800 (34), 1000 (73) | Freeze revision 2: two incomplete code tables and the plane-without-0xff case (`02-crw-format.md`); the low-ISO clip level (`04-color.md`); the D60 colour profile (`assets/camera-profiles/Canon_EOS_D60.json`, 1,424 usable photos) |
+| `Cap&WhiteOut/` | 4 | Lens cap and blown-out frames, ISO 100 and 1000 (2026-10-13) | Black level at ISO 100 matches the image area; at ISO 1000 the border reads about 4 DN high. Clip level about 4000 at ISO 100, 4095 at ISO 1000 (`04-color.md`) |
+| `WBModes/` | 7 | One overcast scene at Auto, Daylight, Cloudy, Tungsten, Fluorescent, Flash, Custom; ISO 100, within a minute (2026-10-14) | White-balance setting n uses ColorBalance slot n (`04-color.md`) |
 | `TripodGrayCard/` | 14 | The same card filling most of the frame, tripod, f/8, ISO 100; two brackets (Auto 1/16–1/6 s, Cloudy 1/12–1/5 s), each starting and ending on the same speed; 14 s each (2026-10-14) | Black level confirmed; sensor linear; the spill strip (below) |
 | `GrayCard/` | 20 | An 18 % grey card (film-era), handheld, overcast; 5 frames at f/4 with exposure compensation, 15 at f/1.8 stepping 1/640–1/1600 s under Cloudy, Daylight and Auto (2026-10-14) | See below |
 

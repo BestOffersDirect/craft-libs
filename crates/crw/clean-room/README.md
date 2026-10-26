@@ -5,43 +5,44 @@ produced in LightCraft (`clean-room/crw/`, branch `clean-room-crw-format-decode`
 `6ca439b5155820d2befeacd81ec0c6a80b2bd3bc`; the record is identical at `70c755e4`, where the decoder was ported) between 2026-10-12 and 2026-10-25 and moved here
 **verbatim** when the decoder became this shared crate. The documents are the evidence: they are
 not rewritten after the fact, so paths they mention are LightCraft's paths of that time (the
-mapping is below), and `00-starting-assumptions.md` is committed once and never edited.
+mapping is below).
+
+The derivation trail — the starting assumptions, the plan, the container notes, the
+entropy-derivation log, the chart calibration, the probe scripts and their observational logs — is
+not part of this record. What this record holds is what the decoder is built from and what a
+reviewer needs to check it: the frozen format, its verification, the payload-layout and colour
+notes, the private-corpus record, the source log and the frozen code tables. Those documents are
+renumbered `01`–`05` in reading order.
 
 ## Documents
 
 | File | What it is |
 |---|---|
-| [`00-starting-assumptions.md`](00-starting-assumptions.md) | What the author believed before consulting any source; every item marked unverified. Immutable. |
-| [`01-plan.md`](01-plan.md) | The derivation plan, the corpus (public CC0 files with hashes; private files by name, size and hash), the maintainer's decisions (§7) and approval. |
 | [`sources.md`](sources.md) | Every URL opened and search run, with the time, what was asked and what was taken. The rules in force are at its top. |
-| [`02-container.md`](02-container.md) | CIFF heap parsing from Canon's specification and ExifTool's prose pages, each fact cited. |
-| [`03-payload-layout.md`](03-payload-layout.md) | The RawData payload partition established by statistics alone (no decoding): low-bits plane, 514-byte header, ff00-stuffed stream, tail. |
-| [`04-derivation-log.md`](04-derivation-log.md) | The entropy-coding derivation, experiment by experiment, against the black-box reference. |
-| [`06-crw-format.md`](06-crw-format.md) | **The frozen format** (revision 2) and its reopening rule. The decoder implements this document. |
-| [`07-verification.md`](07-verification.md) | Full-frame exact comparison against the reference, zero tuning: 28 of 29 files, then 1,516 of 1,516 D60 files. |
-| [`08-color.md`](08-color.md) | CFA phase, active area, black and white levels, white-balance records, orientation and time: what the decoder reports beyond the samples. §3's colour matrices concern LightCraft (below). |
-| [`09-private-corpus.md`](09-private-corpus.md) | The maintainer's EOS D60 files and controlled captures (grey card, lens cap, white-balance presets) and what each set established. |
-| [`10-chart-calibration.md`](10-chart-calibration.md) | EOS D60 colour matrices from ColorChecker captures. This is LightCraft's colour work (`crates/raw/src/chart_table.rs` there), kept here because it is part of the same record and uses the same captures. |
+| [`01-payload-layout.md`](01-payload-layout.md) | The RawData payload partition established by statistics alone (no decoding): low-bits plane, 514-byte header, ff00-stuffed stream, tail. |
+| [`02-crw-format.md`](02-crw-format.md) | **The frozen format** (revision 2) and its reopening rule. The decoder implements this document. |
+| [`03-verification.md`](03-verification.md) | Full-frame exact comparison against the reference, zero tuning: 28 of 29 files, then 1,516 of 1,516 D60 files. |
+| [`04-color.md`](04-color.md) | CFA phase, active area, black and white levels, white-balance records, orientation and time: what the decoder reports beyond the samples. §3's colour matrices concern LightCraft (below). |
+| [`05-private-corpus.md`](05-private-corpus.md) | The maintainer's EOS D60 files and controlled captures (grey card, lens cap, white-balance presets) and what each set established. |
 
-There is no `05-geometry-colour.md`: the plan named it, and the material went into `08-color.md`.
+## Tables and logs
 
-## Scripts and logs
-
-- `ciff_dump.py`, `p1_payload.py`, `p1b_markers.py`, `p1c_lowbits_bounds.py`, `p2_oracle_lsb.py`:
-  the planning and payload-statistics scripts (standard library only; run them with `python -I`).
-  Their public outputs are in `logs/` (`structure-*.txt`, `p1*.txt`, `verification-sweep.txt`).
 - `logs/table_sel{0,1,2}.json`: **the frozen code tables**, the source of truth that
   `tools/gen_tables.py` renders into `../src/tables.rs`. `table_sel0_d60class.json` is the
-  revision-1 selector-0 table, kept for the record.
-- `logs/private-corpus.tsv`, `logs/chart-captures.tsv`: names, sizes and SHA-256 of the
-  maintainer's own files. No image content, metadata or thumbnails are recorded anywhere here.
+  revision-1 selector-0 table, kept for the record. These are the only logs that ship with the
+  crate: without them the frozen tables cannot be regenerated or audited.
+- `logs/private-corpus.tsv`: names, sizes and SHA-256 of the maintainer's own files. No image
+  content, metadata or thumbnails are recorded anywhere here.
 - `logs/private/` (gitignored): per-file dumps of the private files, which can hold personal
   metadata. Local only.
+- The probe scripts and their observational logs (`structure-*.txt`, `p1*.txt`,
+  `verification-sweep.txt`, `chart-captures.tsv`) are not part of this record.
 
 ## What stayed local
 
 - The Python reference model and probe harness (`plan/crw/model/` in LightCraft, gitignored),
-  by the maintainer's decision #4. Its findings are all in `04-derivation-log.md`.
+  by the maintainer's decision #4. Its findings are the entropy-coding derivation, which is not
+  part of this record.
 - The reference decoder: LibRaw 0.22.2, official pre-built Windows binaries installed by the
   maintainer; only `unprocessed_raw.exe` was ever run, as a black box. The source tree shipped
   alongside it was never opened, read or searched.
@@ -65,11 +66,11 @@ There is no `05-geometry-colour.md`: the plan named it, and the material went in
 
 ## Rules that were in force
 
-From `sources.md` and `01-plan.md`: no raw-decoder source may be opened, fetched, searched inside
+From `sources.md`: no raw-decoder source may be opened, fetched, searched inside
 or requested (dcraw, LibRaw, rawspeed, rawloader/rawler, dnglab, darktable, RawTherapee,
 libopenraw, ExifTool's Perl code, including licence headers, comments and mirrors). Allowed:
 published format documentation in prose, published standards, the sample files, and a reference
 decoder's binary run as a black box with every probe logged. No tuning after the freeze: a
 mismatch reopens the derivation explicitly, with its cause and a new freeze commit recorded
-(`06-crw-format.md`, revision 2, is the one reopening). The general standard this followed is
+(`02-crw-format.md`, revision 2, is the one reopening). The general standard this followed is
 [`docs/clean-room.md`](../../../docs/clean-room.md).

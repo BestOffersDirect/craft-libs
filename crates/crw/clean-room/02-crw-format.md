@@ -5,13 +5,13 @@ must reopen it explicitly with a recorded cause and a new freeze commit.
 
 **Revision 2 (2026-10-13), cause:** the maintainer supplied 1,516 D60 files, 50 times the
 first corpus. 223 of them failed on code-table entries the first corpus never exercised,
-and 9 were misread as having no low-bits plane. Two corrections, both recorded in
-`04-derivation-log.md` and re-verified in `07-verification.md`: the low-bits presence rule
+and 9 were misread as having no low-bits plane. Two corrections, both recorded in the
+derivation log (not part of this record) and re-verified in `03-verification.md`: the low-bits presence rule
 (§1) gained the header-position test, and the selector 0 and 1 second tables were completed
 (§3). Nothing else in the model changed, and every file of the first corpus still verifies. Everything here was derived from the CC0/private sample files
 and black-box probing of LibRaw 0.22.2 (`unprocessed_raw.exe`), per the approved plan; no
-decoder source was consulted. The chronological evidence is `04-derivation-log.md`; the
-container and payload groundwork are `02-container.md` and `03-payload-layout.md`.
+decoder source was consulted. The chronological evidence is the derivation log, which is not part
+of this record; the payload groundwork is `01-payload-layout.md`.
 
 ## 1 Payload layout
 
@@ -92,7 +92,7 @@ superset of each file's exercised codes: every row was learned from a real strea
 position and validated by the decode reaching the end of that frame; rows never
 exercised by two files may in principle be mergeable duplicates of canonical slots,
 which the Rust implementation may normalise, provided the verification table of
-`07-verification.md` still reproduces exactly.
+`03-verification.md` still reproduces exactly.
 
 ## 4 Not yet established / out of scope here
 
@@ -110,6 +110,6 @@ which the Rust implementation may normalise, provided the verification table of
 
 ## 5 Verification
 
-See `07-verification.md` (written after the freeze): full-frame exact-match decode
+See `03-verification.md` (written after the freeze): full-frame exact-match decode
 against LibRaw 0.22.2 for every sample file, public and private, with zero tuning
 after the freeze commit.

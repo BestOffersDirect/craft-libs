@@ -1,7 +1,7 @@
 """Regenerate crates/crw/src/tables.rs from the frozen tables in crates/crw/clean-room/logs/table_sel{0,1,2}.json.
 
 Run from anywhere: `python crates/crw/clean-room/tools/gen_tables.py`. The JSON files are the
-derivation's frozen data (06-crw-format.md section 3); this script only renders them as Rust
+derivation's frozen data (02-crw-format.md section 3); this script only renders them as Rust
 constants, keeping the file's doc comment. It was a local tool during the derivation in LightCraft
 (plan/crw/model/gen_tables.py) and moved here so the tables stay reproducible.
 """
