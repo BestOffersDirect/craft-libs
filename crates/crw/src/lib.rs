@@ -647,13 +647,7 @@ fn build_lut(codes: &[(u16, u8, u8, u8)]) -> Vec<u32> {
 /// initialised to 512 and reset at every row start. A stream that ends early leaves the remaining
 /// samples at their chain values (the frozen stream-end rule).
 fn decode_entropy(entropy: &[u8], w: usize, h: usize, tables: &tables::SelTables) -> Result<Vec<u16>> {
-    // unstuff: an 0x00 after an 0xff is a stuffing byte
-    let mut d = Vec::with_capacity(entropy.len());
-    let mut i = 0;
-    while let Some(&b) = entropy.get(i) {
-        d.push(b);
-        i += if b == 0xff && entropy.get(i + 1) == Some(&0x00) { 2 } else { 1 };
-    }
+    let d = unstuff(entropy);
     let nbits = d.len().saturating_mul(8);
     let peek16 = |pos: usize| -> u16 {
         let (byte, sh) = (pos >> 3, pos & 7);
@@ -664,65 +658,35 @@ fn decode_entropy(entropy: &[u8], w: usize, h: usize, tables: &tables::SelTables
 
     let luts = [build_lut(tables.first), build_lut(tables.main)];
     let n = w.checked_mul(h).ok_or(Error::LimitExceeded("image too large"))?;
-    let mut dec = vec![0u16; n];
-    let (mut ce, mut co): (i32, i32) = (512, 512);
+    let mut out = Chains { dec: vec![0u16; n], w, qi: 0, ce: 512, co: 512 };
     let mut carry: i32 = 0;
     let mut pos = 0usize;
-    let mut qi = 0usize;
-    // emit one diff: row-start chain reset, parity chain update, 16-bit masked store
-    macro_rules! emit {
-        ($d:expr) => {{
-            if qi % w == 0 {
-                ce = 512;
-                co = 512;
-            }
-            let c = if qi % 2 == 0 { &mut ce } else { &mut co };
-            *c = c.wrapping_add($d);
-            if let Some(p) = dec.get_mut(qi) {
-                *p = (*c & 0xffff) as u16;
-            }
-            qi += 1;
-        }};
-    }
-    'frame: while qi < n {
-        let block_end = n.min((qi / 64 + 1) * 64);
+    while out.qi < n {
+        let block_end = n.min((out.qi / 64 + 1) * 64);
         let mut tok = 0u32;
-        while qi < block_end {
+        while out.qi < block_end {
+            // stream exhausted: every remaining sample keeps its chain value
             if pos >= nbits.saturating_sub(1) {
-                // stream exhausted: every remaining sample keeps its chain value
-                while qi < n {
-                    emit!(0);
-                }
-                break 'frame;
+                out.fill(n);
+                break;
             }
             let e = luts[usize::from(tok > 0)].get(peek16(pos) as usize).copied().unwrap_or(0);
             if e == 0 {
                 return Err(corrupt("undecodable entropy code"));
             }
-            let (len, rr, s) = ((e >> 16) as usize, ((e >> 8) & 0xff) as usize, e & 0xff);
-            if pos.saturating_add(len) > nbits {
-                while qi < n {
-                    emit!(0);
-                }
-                break 'frame;
+            let (len, mut rr, s) = ((e >> 16) as usize, ((e >> 8) & 0xff) as usize, e & 0xff);
+            if pos.saturating_add(len).saturating_add(s as usize) > nbits {
+                out.fill(n);
+                break;
             }
             pos += len;
-            let mut rr = rr;
-            if s == 0 && rr == 0 && tok > 0 {
+            tok += 1;
+            if s == 0 && rr == 0 && tok > 1 {
                 // end of block
-                while qi < block_end {
-                    emit!(0);
-                }
-                tok += 1;
+                out.fill(block_end);
                 continue;
             }
             let diff: i32 = if s > 0 {
-                if pos.saturating_add(s as usize) > nbits {
-                    while qi < n {
-                        emit!(0);
-                    }
-                    break 'frame;
-                }
                 let m = (peek16(pos) >> (16 - s)) as i32;
                 pos += s as usize;
                 // JPEG magnitude rule
@@ -730,32 +694,67 @@ fn decode_entropy(entropy: &[u8], w: usize, h: usize, tables: &tables::SelTables
             } else {
                 0
             };
-            let mut first = qi.is_multiple_of(64);
+            let mut first = out.qi.is_multiple_of(64);
             if first && rr > 0 {
                 // the block's first sample covered by the skip: its diff is exactly the carry
-                emit!(carry);
+                out.emit(carry);
                 rr -= 1;
                 first = false;
             }
-            for _ in 0..rr {
-                if qi >= block_end {
-                    break;
-                }
-                emit!(0);
-            }
-            if qi >= block_end {
-                tok += 1;
+            out.fill(block_end.min(out.qi + rr));
+            if out.qi >= block_end {
                 continue;
             }
-            let dd = if first {
+            if first {
                 carry = carry.wrapping_add(diff);
-                carry
+                out.emit(carry);
             } else {
-                diff
-            };
-            emit!(dd);
-            tok += 1;
+                out.emit(diff);
+            }
         }
     }
-    Ok(dec)
+    Ok(out.dec)
+}
+
+/// Drop the stuffing byte: an 0x00 after an 0xff.
+fn unstuff(entropy: &[u8]) -> Vec<u8> {
+    let mut d = Vec::with_capacity(entropy.len());
+    let mut i = 0;
+    while let Some(&b) = entropy.get(i) {
+        d.push(b);
+        i += if b == 0xff && entropy.get(i + 1) == Some(&0x00) { 2 } else { 1 };
+    }
+    d
+}
+
+/// The decoded samples and the two parity DPCM chains that produce them.
+struct Chains {
+    dec: Vec<u16>,
+    w: usize,
+    qi: usize,
+    ce: i32,
+    co: i32,
+}
+
+impl Chains {
+    /// Emit one diff: row-start chain reset, parity chain update, 16-bit masked store.
+    fn emit(&mut self, d: i32) {
+        if self.qi.is_multiple_of(self.w) {
+            self.ce = 512;
+            self.co = 512;
+        }
+        let c = if self.qi.is_multiple_of(2) { &mut self.ce } else { &mut self.co };
+        *c = c.wrapping_add(d);
+        if let Some(p) = self.dec.get_mut(self.qi) {
+            *p = (*c & 0xffff) as u16;
+        }
+        self.qi += 1;
+    }
+
+    /// Emit zero diffs up to sample `end`.
+    fn fill(&mut self, end: usize) {
+        while self.qi < end {
+            self.emit(0);
+        }
+    }
 }

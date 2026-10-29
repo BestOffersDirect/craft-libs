@@ -29,8 +29,8 @@ renumbered `01`–`05` in reading order.
 
 - `logs/table_sel{0,1,2}.json`: **the frozen code tables**, the source of truth that
   `tools/gen_tables.py` renders into `../src/tables.rs`. `table_sel0_d60class.json` is the
-  revision-1 selector-0 table, kept for the record. These are the only logs that ship with the
-  crate: without them the frozen tables cannot be regenerated or audited.
+  revision-1 selector-0 table, kept for the record. These are the frozen code-table logs that ship
+  with the crate: without them the frozen tables cannot be regenerated or audited.
 - `logs/private-corpus.tsv`: names, sizes and SHA-256 of the maintainer's own files. No image
   content, metadata or thumbnails are recorded anywhere here.
 - `logs/private/` (gitignored): per-file dumps of the private files, which can hold personal

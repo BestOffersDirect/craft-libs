@@ -111,5 +111,5 @@ which the Rust implementation may normalise, provided the verification table of
 ## 5 Verification
 
 See `03-verification.md` (written after the freeze): full-frame exact-match decode
-against LibRaw 0.22.2 for every sample file, public and private, with zero tuning
-after the freeze commit.
+against LibRaw 0.22.2, with zero tuning after the freeze commit: every sample file, public
+and private, matches except the PowerShot G5, which the decoder refuses (28 of 29).
