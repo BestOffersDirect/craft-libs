@@ -75,7 +75,7 @@ vs −0.67 GRBG). Unsampled PowerShots default to RGGB, unverified.
   (γ-model error), so the slot is chosen by metadata, not by fit.
 - **Slot selection**: ShotInfo (0x102a) index 7 is the WhiteBalance setting (ExifTool prose:
   0 Auto, 1 Daylight, 2 Cloudy, 3 Tungsten, 4 Fluorescent, 5 Flash, 6 Custom, 8 Shade,
-  9 Kelvin). Every corpus file reads 0 (Auto) → slot 0.
+  9 Kelvin). Every corpus file outside the preset captures below reads 0 (Auto) → slot 0.
 - **D60 preset mapping verified** (2026-10-14): the maintainer shot one overcast scene at
   each setting, Auto, Daylight, Cloudy, Tungsten, Fluorescent, Flash and Custom, ISO 100,
   within a minute (all seven decode sample-exact). Slots 1–6 hold the same multipliers in

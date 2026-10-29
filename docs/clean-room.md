@@ -65,6 +65,10 @@ folder with:
 8. **Table data** lives in the record as JSON and is rendered into Rust by a committed script; the
    generated file says so and is never edited by hand.
 
+When the derivation was done in another repository, the crate's `clean-room/` may hold only items
+3, 5, 6 and 8, provided it pins that repository, path and revision (in its README and in `NOTICE`)
+for the starting assumptions, the plan and the derivation documents, as `craft-crw` does.
+
 Scripts in the record use the Python standard library only and run under `python -I`. Local-only
 material (reference models, oracle binaries, copyrighted specification PDFs, dumps that may carry
 personal metadata) is named in the record with how to obtain it, and is gitignored.

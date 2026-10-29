@@ -99,8 +99,8 @@ which the Rust implementation may normalise, provided the verification table of
 - **G5 anomaly**: its entropy stream decodes end-to-end with the selector-1 tables,
   but values diverge beginning at sample 2056 (= 4 × 514), and its low-bits plane fits
   no tested layout (top rows mostly match, decaying to 0 %, no constant shift). The
-  decoder must detect the G5 (CanonModelID / make-model) and fall back to the embedded
-  JPEG until a follow-up derivation resolves it.
+  decoder detects the G5 by its make-model and returns `Error::Unsupported` until a
+  follow-up derivation resolves it; a caller may fall back to the embedded JPEG.
 - The exact meaning of each file's tail bytes (handled by the stream-end rule).
 - Big-endian (`MM`) CIFF files: no sample exists.
 - PowerShot G2/G3/Pro1/Pro70/S30–S70: no CC0 samples (licence-excluded); decodable

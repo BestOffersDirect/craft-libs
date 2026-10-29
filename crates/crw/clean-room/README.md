@@ -1,9 +1,9 @@
 # Canon CRW clean-room derivation record
 
-Everything that establishes how `craft-crw` decodes a CRW, in the order it happened. The record was
+What `craft-crw` decodes a CRW from, and the evidence that it is right. The full record was
 produced in LightCraft (`clean-room/crw/`, branch `clean-room-crw-format-decode`, revision
-`6ca439b5155820d2befeacd81ec0c6a80b2bd3bc`; the record is identical at `70c755e4`, where the decoder was ported) between 2026-10-12 and 2026-10-25 and moved here
-**verbatim** when the decoder became this shared crate. The documents are the evidence: they are
+`6ca439b5155820d2befeacd81ec0c6a80b2bd3bc`; the record is identical at `70c755e4`, where the decoder was ported) between 2026-10-12 and 2026-10-25; the documents below moved here
+**verbatim** when the decoder became this shared crate, and the derivation trail stays at that revision. The documents are the evidence: they are
 not rewritten after the fact, so paths they mention are LightCraft's paths of that time (the
 mapping is below).
 
