@@ -200,8 +200,10 @@ impl Updater {
         let requested = std::mem::take(&mut self.requested);
         match answer {
             Ok(Some(release)) => {
-                self.status = Status::Idle;
-                if self.prompt.is_none() && self.install.is_none() && !self.installed && self.managed.is_none() {
+                // The launcher may have pinned the app while the check ran.
+                let managed = self.read_choice();
+                self.status = if managed && requested { Status::UpToDate } else { Status::Idle };
+                if self.prompt.is_none() && self.install.is_none() && !self.installed && !managed {
                     self.prompt = Some(StartupPrompt::new(self.app, release, self.version.clone()));
                 }
             }

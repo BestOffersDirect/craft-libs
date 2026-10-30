@@ -122,3 +122,23 @@ fn a_running_install_keeps_its_prompt_when_the_app_is_pinned() {
     assert!(u.read_choice());
     assert!(u.prompt_open(), "tick reports the running install through the prompt");
 }
+
+#[test]
+fn a_pin_made_while_the_check_runs_still_holds_its_answer() {
+    let ctx = egui::Context::default();
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("versions.json");
+    let during = path.clone();
+    // The check itself pins the app before answering, as the launcher could mid-check.
+    let source: CheckSource = Arc::new(move || {
+        let mut pins = Pins::default();
+        pins.set(PHOTOCRAFT.id, &crate::pins::VersionTrack::Pinned("v0.13.0".into()));
+        pins.save(&during)?;
+        Ok(Some(newer()))
+    });
+    let mut u = Updater::new(&PHOTOCRAFT, "0.13.0").with_source(source).with_pins_path(&path);
+    u.check_now(&ctx);
+    settle(&mut u, &ctx);
+    assert!(!u.prompt_open());
+    assert_eq!(u.status(), &Status::UpToDate);
+}
