@@ -4,6 +4,13 @@
 //! own update check reads it, so an app kept on an older release, or on nightlies, is not offered
 //! the latest stable release every time it starts. Only the launcher writes the file; apps read.
 //!
+//! The file sits in a folder of its own, `ArtCraft/versions` in the host's per-user data folder
+//! (`%LOCALAPPDATA%`, `~/Library/Application Support`, `$XDG_DATA_HOME` or `~/.local/share`),
+//! never in the launcher's own folder: a Flatpak launcher's own folder is inside its sandbox, and a
+//! Flatpak app can be given read access to this one folder alone
+//! (`--filesystem=xdg-data/ArtCraft/versions:ro`) without seeing the launcher's settings.
+//! Inside a Flatpak, the host's folder is used (see [`crate::folders::host_data_local_dir`]).
+//!
 //! Invariants:
 //! - A missing, unreadable or damaged file means every app follows stable releases, as before.
 //! - An entry this version cannot read (written by a newer launcher) counts as managed by the
@@ -18,6 +25,10 @@ use serde::{Deserialize, Serialize};
 /// Names a file to use in place of the default (absolute paths only). The launcher sets it for an
 /// app whose home it redirects (tarball installs on Linux), so the app still finds the real file.
 pub const PATH_ENV: &str = "CRAFT_VERSIONS_FILE";
+
+/// The line a Flatpak app's manifest adds to its `finish-args` so it can read the file. It names
+/// the folder [`Pins::default_path`] uses; the two change together or Flatpak apps lose the file.
+pub const FLATPAK_GRANT: &str = "--filesystem=xdg-data/ArtCraft/versions:ro";
 
 /// Which published build an app follows. A pinned version never changes on its own.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -53,14 +64,12 @@ pub enum Choice {
 }
 
 impl Pins {
-    /// The file in the launcher's per-user data folder, or the one [`PATH_ENV`] names.
+    /// The shared file (see the module notes), or the one [`PATH_ENV`] names.
     pub fn default_path() -> Option<PathBuf> {
         if let Some(path) = std::env::var_os(PATH_ENV).map(PathBuf::from).filter(|p| p.is_absolute()) {
             return Some(path);
         }
-        let launcher = &crate::suite::LAUNCHER;
-        let dir = if cfg!(any(target_os = "macos", target_os = "windows")) { launcher.name } else { launcher.id };
-        crate::folders::data_local_dir().map(|d| d.join(dir).join("versions.json"))
+        crate::folders::host_data_local_dir().map(|d| d.join("ArtCraft").join("versions").join("versions.json"))
     }
 
     /// Reads `path`. A missing or damaged file reads as empty: every app follows stable releases.
@@ -211,7 +220,7 @@ mod tests {
     }
 
     #[test]
-    fn the_default_file_sits_in_the_launchers_data_folder() {
+    fn the_default_file_sits_in_its_own_folder_outside_the_launchers() {
         // The environment override is read by the same function; it is not set in tests.
         if std::env::var_os(PATH_ENV).is_some() {
             return;
@@ -219,8 +228,10 @@ mod tests {
         if let Some(path) = Pins::default_path() {
             assert!(path.is_absolute());
             assert_eq!(path.file_name().and_then(|n| n.to_str()), Some("versions.json"));
-            let folder = path.parent().and_then(|p| p.file_name()).and_then(|n| n.to_str()).unwrap_or_default().to_string();
-            assert!(folder == "ArtCraft Launcher" || folder == "artcraft-launcher", "{folder}");
+            // The folder is the one the Flatpak grant names, under the host's data folder.
+            let granted = FLATPAK_GRANT.strip_prefix("--filesystem=xdg-data/").and_then(|g| g.strip_suffix(":ro")).unwrap_or_default();
+            let expected = granted.split('/').fold(crate::folders::host_data_local_dir().unwrap_or_default(), |p, part| p.join(part));
+            assert_eq!(path.parent(), Some(expected.as_path()), "{FLATPAK_GRANT}");
         }
     }
 }
