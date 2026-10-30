@@ -142,3 +142,25 @@ fn a_pin_made_while_the_check_runs_still_holds_its_answer() {
     assert!(!u.prompt_open());
     assert_eq!(u.status(), &Status::UpToDate);
 }
+
+#[test]
+fn every_answer_after_a_pin_made_mid_check_reports_the_launchers_choice() {
+    let ctx = egui::Context::default();
+    let answers: [Checked; 2] = [Ok(None), Err("offline".into())];
+    for answer in answers {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("versions.json");
+        let during = path.clone();
+        let source: CheckSource = Arc::new(move || {
+            let mut pins = Pins::default();
+            pins.set(PHOTOCRAFT.id, &crate::pins::VersionTrack::Nightly);
+            pins.save(&during)?;
+            answer.clone()
+        });
+        let mut u = Updater::new(&PHOTOCRAFT, "0.13.0").with_source(source).with_pins_path(&path);
+        u.check_now(&ctx);
+        settle(&mut u, &ctx);
+        assert_eq!(u.status(), &Status::UpToDate);
+        assert_eq!(u.managed(), Some(&Choice::Managed(crate::pins::VersionTrack::Nightly)));
+    }
+}

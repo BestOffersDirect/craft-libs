@@ -198,12 +198,19 @@ impl Updater {
 
     fn finish_check(&mut self, answer: Checked) {
         let requested = std::mem::take(&mut self.requested);
+        // The launcher may have pinned or unpinned the app while the check ran: whatever the
+        // answer, an app it manages offers nothing and reports nothing to do.
+        if self.read_choice() {
+            if let Err(e) = &answer {
+                log::info!("{} update check failed ({e}), but the launcher manages its version", self.app.name);
+            }
+            self.status = if requested { Status::UpToDate } else { Status::Idle };
+            return;
+        }
         match answer {
             Ok(Some(release)) => {
-                // The launcher may have pinned the app while the check ran.
-                let managed = self.read_choice();
-                self.status = if managed && requested { Status::UpToDate } else { Status::Idle };
-                if self.prompt.is_none() && self.install.is_none() && !self.installed && !managed {
+                self.status = Status::Idle;
+                if self.prompt.is_none() && self.install.is_none() && !self.installed {
                     self.prompt = Some(StartupPrompt::new(self.app, release, self.version.clone()));
                 }
             }
