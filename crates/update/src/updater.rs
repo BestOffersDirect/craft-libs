@@ -59,9 +59,11 @@ pub struct Updater {
 
 impl Updater {
     pub fn new(app: &'static App, version: impl Into<String>) -> Self {
+        let version = version.into();
+        let version = self_update::current_version(app, &version).map_or(version, |v| v.to_string());
         Self {
             app,
-            version: version.into(),
+            version,
             source: None,
             status: Status::Idle,
             requested: false,
@@ -326,6 +328,54 @@ mod tests {
 
     fn newer() -> Release {
         Release { tag: "v9.0.0".into(), version: crate::version::parse("9.0.0"), ..Release::default() }
+    }
+
+    // Child processes isolate environment overrides from parallel tests without unsafe set_var.
+    #[test]
+    fn pretend_versions_trigger_startup_prompts_for_every_app() {
+        const CHILD: &str = "CRAFT_UPDATE_PRETEND_TEST_APP";
+        if let Ok(id) = std::env::var(CHILD) {
+            let app = crate::suite::by_id(&id).unwrap();
+            let mut u = Updater::new(app, "99.0.0");
+            assert_eq!(u.version, "0.0.1", "{} ignored its pretend version", app.id);
+            let version = u.version.clone();
+            let repo = app.repo;
+            u = u.with_source(Arc::new(move || {
+                crate::offered_release(r#"[{"tag_name":"v1.0.0","name":"Test release","draft":false,"prerelease":false}]"#, repo, &version)
+            }));
+            let ctx = egui::Context::default();
+            u.check_at_start(&ctx);
+            settle(&mut u, &ctx);
+            assert!(u.prompt_open(), "{} did not offer the newer release", app.id);
+            // The explicit test override also applies to the pre-existing installation guard.
+            // No assets means the installer stops before any network request or file replacement.
+            let dir = tempfile::tempdir().unwrap();
+            let error = self_update::update(
+                app,
+                &self_update::Install::AppImage(dir.path().join("test.AppImage")),
+                &newer(),
+                Platform { os: crate::Os::Linux, arch: crate::Arch::X64 },
+                &Http::new(crate::TEST_AGENT).unwrap(),
+                &Paths::under(dir.path()),
+                &Stop::default(),
+                &mut |_| {},
+                &|| Ok(()),
+                Some("99.0.0"),
+            )
+            .unwrap_err();
+            assert!(error.contains("has no"), "{}: {error}", app.id);
+            return;
+        }
+        for app in &crate::suite::SUITE {
+            let status = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "updater::tests::pretend_versions_trigger_startup_prompts_for_every_app", "--nocapture"])
+                .env(CHILD, app.id)
+                .env(format!("{}_PRETEND_VERSION", app.id.to_uppercase()), "0.0.1")
+                .env_remove(self_update::PRETEND_VAR)
+                .status()
+                .unwrap();
+            assert!(status.success(), "{} pretend-version regression failed", app.id);
+        }
     }
 
     #[test]

@@ -85,12 +85,21 @@ pub const DEV_VAR: &str = "CRAFT_UPDATE_DEV";
 
 /// The version this app counts as (see [`PRETEND_VAR`]).
 pub fn current_version(app: &App, fallback_pkg_version: &str) -> Option<Version> {
-    let app_pretend = format!("{}_PRETEND_VERSION", app.id.replace('-', "_").to_uppercase());
+    let app_pretend = pretend_var(app);
     std::env::var(&app_pretend)
         .or_else(|_| std::env::var(PRETEND_VAR))
         .ok()
         .and_then(|v| version::parse(&v))
         .or_else(|| version::parse(fallback_pkg_version))
+}
+
+fn pretend_var(app: &App) -> String {
+    format!("{}_PRETEND_VERSION", app.id.replace('-', "_").to_uppercase())
+}
+
+/// A pretend version lasts one run, including when an update schedules a restart.
+fn clear_pretend_version(cmd: &mut std::process::Command, app: &App) {
+    cmd.env_remove(PRETEND_VAR).env_remove(pretend_var(app));
 }
 
 /// How long a just-installed version stays exempt from being offered again.
@@ -319,7 +328,8 @@ pub fn update(
     if let (Some(rel_v), Some(cur_v)) = (release.version.as_ref(), cur_v.as_ref())
         && !version::offers_update(rel_v, cur_v)
     {
-        // A build from source is only replaced by a strictly higher release (see `offers_update`).
+        // Compare the effective version: an explicit pretend version also exercises installation.
+        // Without that opt-in, a build from source requires a strictly higher release.
         return Err(format!("{} {} is not newer than currently running version {}", app.name, release.version_label(), cur_v));
     }
     let (asset, _) = pick_asset(release, &[app.id], platform, &[install.kind()])
@@ -345,20 +355,20 @@ pub fn update(
                 let placed = install::macos::install_dmg(app, &file, Some(&existing), None, false, paths, &install::macos::Expect::release(release));
                 let _ = std::fs::remove_file(&file);
                 let placed = placed?;
-                relaunch_after_exit(pid, &[Path::new("/usr/bin/open").as_os_str(), placed.as_os_str()])
+                relaunch_after_exit(app, pid, &[Path::new("/usr/bin/open").as_os_str(), placed.as_os_str()])
             }
             #[cfg(target_os = "linux")]
             Install::AppImage(path) => {
                 replace_appimage(&file, path)?;
                 let _ = std::fs::remove_file(&file);
-                relaunch_after_exit(pid, &[path.as_os_str()])
+                relaunch_after_exit(app, pid, &[path.as_os_str()])
             }
             #[cfg(target_os = "linux")]
             Install::Package(kind, exe) => {
                 let result = install::linux::install_package(*kind, &file, stop, phase);
                 let _ = std::fs::remove_file(&file);
                 result?;
-                relaunch_after_exit(pid, &[exe.as_os_str()])
+                relaunch_after_exit(app, pid, &[exe.as_os_str()])
             }
             #[cfg(target_os = "linux")]
             Install::Flatpak => {
@@ -384,7 +394,7 @@ pub fn update(
                 let result = replace_standalone(app, &file, exe);
                 let _ = std::fs::remove_file(&file);
                 result?;
-                relaunch_after_exit(pid, &[exe.as_os_str()])
+                relaunch_after_exit(app, pid, &[exe.as_os_str()])
             }
             #[allow(unreachable_patterns)]
             _ => {
@@ -468,20 +478,19 @@ fn replace_standalone(app: &App, tarball: &Path, exe: &Path) -> Result<(), Strin
 
 /// Starts `sh`, which waits for `pid` to exit and then runs `command`. Detached, so it outlives us.
 #[cfg(unix)]
-fn relaunch_after_exit(pid: u32, command: &[&std::ffi::OsStr]) -> Result<(), String> {
-    process::spawn_detached(helper_command(pid, command)).map_err(|e| format!("couldn't schedule the restart ({e})"))
+fn relaunch_after_exit(app: &App, pid: u32, command: &[&std::ffi::OsStr]) -> Result<(), String> {
+    process::spawn_detached(helper_command(app, pid, command)).map_err(|e| format!("couldn't schedule the restart ({e})"))
 }
 
 #[cfg(unix)]
-fn helper_command(pid: u32, command: &[&std::ffi::OsStr]) -> std::process::Command {
+fn helper_command(app: &App, pid: u32, command: &[&std::ffi::OsStr]) -> std::process::Command {
     let mut cmd = process::command("/bin/sh");
     cmd.arg("-c")
         .arg(r#"pid=$1; shift; i=0; while kill -0 "$pid" 2>/dev/null && [ $i -lt 600 ]; do sleep 0.1; i=$((i+1)); done; exec "$@""#)
         .arg("sh")
         .arg(pid.to_string())
-        .args(command)
-        // The new launcher reports its real version; a pretend one was for this run only.
-        .env_remove(PRETEND_VAR);
+        .args(command);
+    clear_pretend_version(&mut cmd, app);
     cmd
 }
 
@@ -545,10 +554,19 @@ fn relaunch_flatpak_after_exit(app: &App) -> Result<(), String> {
         (None, None) => return Err(format!("{} is updated; quit and reopen it to start the new version", app.name)),
     };
     let script = format!("({wait_clause}) &");
+    process::spawn_detached(flatpak_restart_command(app, &script, &target_arg)).map_err(|e| format!("couldn't schedule the Flatpak restart ({e})"))
+}
+
+#[cfg(target_os = "linux")]
+fn flatpak_restart_command(app: &App, script: &str, target: &str) -> std::process::Command {
     let app_id = app.bundle_id();
+    // flatpak run reapplies persistent overrides; removing inherited variables alone is insufficient.
+    let global_unset = format!("--unset-env={PRETEND_VAR}");
+    let app_unset = format!("--unset-env={}", pretend_var(app));
     let mut cmd = process::command("flatpak-spawn");
-    cmd.args(["--host", "sh", "-c", &script, "sh", &target_arg, "flatpak", "run", &app_id]).env_remove(PRETEND_VAR);
-    process::spawn_detached(cmd).map_err(|e| format!("couldn't schedule the Flatpak restart ({e})"))
+    cmd.args(["--host", "sh", "-c", script, "sh", target, "flatpak", "run", &global_unset, &app_unset, &app_id]);
+    clear_pretend_version(&mut cmd, app);
+    cmd
 }
 
 /// The first argument of the Windows update helper: a copy of this program that finishes an
@@ -609,7 +627,7 @@ const PORTABLE_STAGING: &str = "launcher-update";
 /// `pid` to exit, does `finish` and starts `exe`. Run from the cache, the helper doesn't hold the
 /// installed exe that the step replaces.
 #[cfg(windows)]
-fn windows_helper(_app: &App, paths: &Paths, pid: u32, exe: &Path, finish: &Finish) -> Result<(), String> {
+fn windows_helper(app: &App, paths: &Paths, pid: u32, exe: &Path, finish: &Finish) -> Result<(), String> {
     let program = std::env::current_exe().map_err(|e| format!("couldn't find this program ({e})"))?;
     let dir = paths.cache.join(HELPER_DIR);
     // The previous update's copy, when it's still there.
@@ -618,7 +636,8 @@ fn windows_helper(_app: &App, paths: &Paths, pid: u32, exe: &Path, finish: &Fini
     let helper = dir.join(program.file_name().ok_or("this program has no file name")?);
     std::fs::copy(&program, &helper).map_err(|e| format!("couldn't schedule the update ({e})"))?;
     let mut cmd = process::command(&helper);
-    cmd.args(helper_args(pid, exe, finish)).env_remove(PRETEND_VAR);
+    cmd.args(helper_args(pid, exe, finish));
+    clear_pretend_version(&mut cmd, app);
     process::spawn_detached(cmd).map_err(|e| format!("couldn't schedule the update ({e})"))
 }
 
@@ -1466,8 +1485,36 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn the_restarted_launcher_does_not_inherit_a_pretend_version() {
-        let cmd = helper_command(1, &[std::ffi::OsStr::new("/usr/bin/true")]);
+        let cmd = helper_command(&crate::suite::LAUNCHER, 1, &[std::ffi::OsStr::new("/usr/bin/true")]);
         assert!(cmd.get_envs().any(|(k, v)| k == PRETEND_VAR && v.is_none()), "the helper must remove {PRETEND_VAR}");
+    }
+
+    #[test]
+    fn restarted_apps_do_not_inherit_their_pretend_versions() {
+        for app in crate::suite::SUITE.iter().chain(std::iter::once(&crate::suite::LAUNCHER)) {
+            let mut cmd = std::process::Command::new("unused");
+            clear_pretend_version(&mut cmd, app);
+            for key in [PRETEND_VAR.to_string(), pretend_var(app)] {
+                assert!(cmd.get_envs().any(|(k, v)| k == key.as_str() && v.is_none()), "{} retained {key}", app.id);
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn flatpak_restart_unsets_persistent_pretend_version_overrides() {
+        for app in &crate::suite::SUITE {
+            let cmd = flatpak_restart_command(app, "exec \"$@\"", "123");
+            let args: Vec<_> = cmd.get_args().map(|v| v.to_string_lossy().into_owned()).collect();
+            let expected = [
+                "flatpak".to_string(),
+                "run".to_string(),
+                format!("--unset-env={PRETEND_VAR}"),
+                format!("--unset-env={}", pretend_var(app)),
+                app.bundle_id(),
+            ];
+            assert!(args.windows(expected.len()).any(|w| w == expected), "{}: {args:?}", app.id);
+        }
     }
 
     /// The helper waits for the old launcher to exit before it starts the new one.
@@ -1477,7 +1524,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let marker = dir.path().join("started");
         let mut old = std::process::Command::new("sleep").arg("1").spawn().unwrap();
-        relaunch_after_exit(old.id(), &[std::ffi::OsStr::new("touch"), marker.as_os_str()]).unwrap();
+        relaunch_after_exit(&crate::suite::LAUNCHER, old.id(), &[std::ffi::OsStr::new("touch"), marker.as_os_str()]).unwrap();
         std::thread::sleep(std::time::Duration::from_millis(400));
         assert!(!marker.exists(), "started while the old launcher was still running");
         old.wait().unwrap();
