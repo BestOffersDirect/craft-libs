@@ -116,6 +116,11 @@ impl Updater {
         self.managed = Some(pins.choice(self.app.id)).filter(|c| *c != Choice::Stable);
         if let Some(choice) = &self.managed {
             log::info!("{} follows the launcher's choice ({choice:?}); no update offered here", self.app.name);
+            // A prompt opened before the pin would still install the stable release. One that is
+            // installing or finished stays: `tick` reports through it.
+            if self.install.is_none() && !self.installed {
+                self.prompt = None;
+            }
         }
         self.managed.is_some()
     }
@@ -307,6 +312,10 @@ impl Updater {
     }
 
     fn start_install(&mut self, ctx: &egui::Context) {
+        // The launcher may have pinned the app while the prompt was open; that closes it.
+        if self.install.is_none() && !self.installed && self.read_choice() {
+            return;
+        }
         let Some(prompt) = &mut self.prompt else { return };
         if self.installed {
             prompt.status_message = Some(format!("The update is installed. Close {} to finish; it restarts by itself.", self.app.name));
@@ -384,7 +393,7 @@ mod tests {
         const CHILD: &str = "CRAFT_UPDATE_PRETEND_TEST_APP";
         if let Ok(id) = std::env::var(CHILD) {
             let app = crate::suite::by_id(&id).unwrap();
-            let mut u = Updater::new(app, "99.0.0");
+            let mut u = Updater::new(app, "99.0.0").with_pins_path(no_pins());
             assert_eq!(u.version, "0.0.1", "{} ignored its pretend version", app.id);
             let version = u.version.clone();
             let repo = app.repo;

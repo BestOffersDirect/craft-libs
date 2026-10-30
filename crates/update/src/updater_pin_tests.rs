@@ -79,3 +79,46 @@ fn another_apps_pin_does_not_hold_this_one() {
     settle(&mut u, &ctx);
     assert!(u.prompt_open());
 }
+
+#[test]
+fn a_prompt_opened_before_the_pin_cannot_install_the_stable_release() {
+    let ctx = egui::Context::default();
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("versions.json");
+    let mut u = Updater::new(&PHOTOCRAFT, "0.13.0").with_source(Arc::new(|| Ok(Some(newer())))).with_pins_path(&path);
+    u.offer(newer());
+    assert!(u.prompt_open());
+    let mut pins = Pins::default();
+    pins.set(PHOTOCRAFT.id, &crate::pins::VersionTrack::Pinned("v0.13.0".into()));
+    pins.save(&path).unwrap();
+    u.request_install(&ctx, true);
+    assert!(u.install.is_none(), "nothing installs once the launcher pinned the app");
+    assert!(!u.prompt_open());
+}
+
+#[test]
+fn a_check_after_the_pin_closes_a_prompt_opened_before_it() {
+    let ctx = egui::Context::default();
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("versions.json");
+    let mut u = Updater::new(&PHOTOCRAFT, "0.13.0").with_source(Arc::new(|| Ok(Some(newer())))).with_pins_path(&path);
+    u.offer(newer());
+    let mut pins = Pins::default();
+    pins.set(PHOTOCRAFT.id, &crate::pins::VersionTrack::Nightly);
+    pins.save(&path).unwrap();
+    u.check_now(&ctx);
+    settle(&mut u, &ctx);
+    assert!(!u.prompt_open());
+    assert_eq!(u.status(), &Status::UpToDate);
+}
+
+#[test]
+fn a_running_install_keeps_its_prompt_when_the_app_is_pinned() {
+    let dir = pins_with(crate::pins::VersionTrack::Pinned("v0.13.0".into()));
+    let mut u = Updater::new(&PHOTOCRAFT, "0.13.0").with_pins_path(dir.path().join("versions.json"));
+    u.prompt = Some(StartupPrompt::new(&PHOTOCRAFT, newer(), "0.13.0"));
+    let (_tx, rx) = channel();
+    u.install = Some((rx, newer()));
+    assert!(u.read_choice());
+    assert!(u.prompt_open(), "tick reports the running install through the prompt");
+}

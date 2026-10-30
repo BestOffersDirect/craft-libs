@@ -131,7 +131,10 @@ impl Pins {
 
     /// Every app with a track this version can read, stable ones excluded.
     pub fn tracks(&self) -> impl Iterator<Item = (&str, VersionTrack)> {
-        self.apps.iter().filter_map(|(id, raw)| serde_json::from_value(raw.clone()).ok().map(|t| (id.as_str(), t)))
+        self.apps
+            .iter()
+            .filter_map(|(id, raw)| serde_json::from_value(raw.clone()).ok().map(|t| (id.as_str(), t)))
+            .filter(|(_, track)| *track != VersionTrack::Stable)
     }
 }
 
@@ -188,6 +191,8 @@ mod tests {
         assert_eq!(pins.track("pdfcraft"), Some(pinned("v0.13.0")));
         assert_eq!(pins.track("filmcraft"), Some(VersionTrack::Nightly));
         assert_eq!(pins.choice("wordcraft"), Choice::Stable);
+        let listed: Vec<&str> = pins.tracks().map(|(id, _)| id).collect();
+        assert_eq!(listed, ["filmcraft", "pdfcraft"], "an explicit Stable entry is not listed");
     }
 
     #[test]
