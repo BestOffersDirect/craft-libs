@@ -947,6 +947,8 @@ pub(crate) mod linux {
         }
         // pkexec: 126 = the password prompt was dismissed, 127 = not authorized.
         if matches!(output.status.code(), Some(126 | 127)) {
+            let detail = String::from_utf8_lossy(&output.stderr);
+            log::warn!("flatpak bundle install ended with {:?}: {}", output.status.code(), detail.trim());
             return Err(CANCELLED.into());
         }
         let stderr = String::from_utf8_lossy(&output.stderr);
