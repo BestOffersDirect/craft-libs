@@ -1,15 +1,15 @@
 # CRW decode verification (P4) — against LibRaw 0.22.2, zero tuning
 
-Method: the frozen model of `02-crw-format.md` plus the frozen tables
-(`logs/table_sel{0,1,2}.json`) were run by the local Python reference decoder over every
+Method: the frozen model of `02-crw-format.md` plus the frozen tables retained in
+LightCraft PR #3021 were run by the local Python reference decoder over every
 sample file, comparing **every sensor sample** (full values, low bits merged) against
 `unprocessed_raw.exe -T` output. "EXACT" means zero mismatching samples over the whole
 frame. The table extraction itself consumed these same files (known-plaintext learning),
 so this is a consistency proof against the oracle, not a blind holdout; the cross-body
 sharing (tables learned on one body, exact on others) is the strongest independent check.
 
-Private files are the maintainer's own D60 photos (hashes in `logs/private-corpus.tsv`);
-only their verdicts are recorded here, never content.
+Private files were the maintainer's own D60 photos; only aggregate verdicts are recorded here,
+never filenames or content.
 
 ## Results
 

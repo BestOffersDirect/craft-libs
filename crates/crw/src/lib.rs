@@ -7,7 +7,7 @@
 //! black-box analysis against a reference decoder's command-line output, frozen in
 //! `clean-room/02-crw-format.md` and verified sample-exact on 28 of 29 corpus files plus 1,516
 //! further EOS D60 files (`clean-room/03-verification.md`). The code tables are frozen data
-//! (`tables`, generated from `clean-room/logs/table_sel{0,1,2}.json`). No other raw decoder's
+//! (`tables`, frozen from the clean-room derivation record retained in LightCraft). No other raw decoder's
 //! source was consulted; the whole derivation record is in the crate's `clean-room/` folder.
 //!
 //! - [`probe`] recognises the CIFF signature.

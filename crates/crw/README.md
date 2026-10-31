@@ -125,7 +125,7 @@ About 60 ms for a 6.5 MP EOS file and 70 ms for the 7.4 MP G6 in release mode on
 ## Origin
 
 The decoder was written in LightCraft as `crates/raw/src/vendor/crw.rs` and `crw_tables.rs`
-(branch `clean-room-crw-format-decode`, revision `6ca439b5155820d2befeacd81ec0c6a80b2bd3bc`,
+(LightCraft PR #3021, revision `6ca439b5155820d2befeacd81ec0c6a80b2bd3bc`,
 [storytold/lightcraft](https://github.com/storytold/lightcraft); the decoder itself was ported at
 `70c755e4`, and the branch's later review commits changed only a date conversion that is not part
 of this crate) and moved here with its tests and
@@ -136,12 +136,11 @@ seconds instead of converting it in the decoder, and copied LightCraft's shared 
 and the sample-file test proves the decode is byte-identical to the verified LightCraft decode.
 Colour (camera matrices, profiles, the JPEG-fitted look) stayed in LightCraft.
 
-## Regenerating the tables
+## Frozen tables
 
-`src/tables.rs` is generated data. Edit nothing by hand: the source of truth is
-`clean-room/logs/table_sel{0,1,2}.json`, and `python crates/crw/clean-room/tools/gen_tables.py`
-renders it (byte-identical to the committed file). A change to the tables is a change to the frozen
-format and must follow the reopening rule of `clean-room/02-crw-format.md`.
+`src/tables.rs` contains frozen code tables from the clean-room derivation record retained in
+[LightCraft](https://github.com/storytold/lightcraft). Do not edit them by hand. A table change is
+a change to the frozen format and must follow the reopening rule of `clean-room/02-crw-format.md`.
 
 ## Boundaries
 

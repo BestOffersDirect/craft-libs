@@ -205,7 +205,7 @@ The Canon CRW decoder in crates/crw (src/lib.rs, src/tables.rs, src/tests.rs, te
 derivation record (crates/crw/clean-room/) come from:
 - LightCraft, crates/raw/src/vendor/crw.rs, crates/raw/src/vendor/crw_tables.rs,
   crates/raw/tests/crw_oracle.rs, crates/raw/tests/it/vendor_robust.rs and clean-room/crw/,
-  branch clean-room-crw-format-decode, revision 6ca439b5155820d2befeacd81ec0c6a80b2bd3bc
+  https://github.com/storytold/lightcraft/pull/3021, revision 6ca439b5155820d2befeacd81ec0c6a80b2bd3bc
   (decoder ported at 70c755e42a65661401142819278d51b0c5977f7f; the record is identical at both).
   https://github.com/storytold/lightcraft
   Copyright (c) 2026 ArtCraft Team and the LightCraft contributors.
