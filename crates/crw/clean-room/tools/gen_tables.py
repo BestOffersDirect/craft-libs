@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Regenerate crates/crw/src/tables.rs from the frozen tables in crates/crw/clean-room/logs/table_sel{0,1,2}.json.
 
 Run from anywhere: `python crates/crw/clean-room/tools/gen_tables.py`. The JSON files are the
