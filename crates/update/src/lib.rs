@@ -48,7 +48,7 @@ pub use time::parse_rfc3339;
 pub use version::{Version, is_newer, parse as parse_version};
 
 #[cfg(feature = "egui")]
-pub use dialog::{StartupPrompt, StartupPromptResponse};
+pub use dialog::{CheckResultDialog, CheckResultResponse, StartupPrompt, StartupPromptResponse};
 
 /// Checks for an update against GitHub releases for the given app.
 pub fn check_for_update(app: &App, http: &Http, current_version: &str) -> Result<Option<Release>, String> {

@@ -4,6 +4,7 @@ use egui::{Align, Align2, Color32, Layout, RichText, Vec2};
 
 use crate::app::App;
 use crate::release::Release;
+use crate::updater::Status;
 
 /// What the user chose in the startup update prompt.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -45,24 +46,14 @@ impl StartupPrompt {
 
         let mut response = StartupPromptResponse::Pending;
 
-        // Modal dimmed background overlay; it senses clicks so they don't reach widgets underneath.
-        let screen_rect = ctx.content_rect();
-        egui::Area::new(egui::Id::unique("craft_update_backdrop")).order(egui::Order::Middle).fixed_pos(screen_rect.min).show(ctx, |ui| {
-            let (rect, _) = ui.allocate_exact_size(screen_rect.size(), egui::Sense::click_and_drag());
-            ui.painter().rect_filled(rect, 0.0, Color32::from_black_alpha(150));
-        });
+        backdrop(ctx);
 
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) {
             response = StartupPromptResponse::Later;
         }
 
-        let is_dark = ctx.theme() == egui::Theme::Dark;
-        let card_bg = if is_dark { Color32::from_rgb(26, 26, 28) } else { Color32::from_rgb(255, 255, 255) };
-        let border_color = if is_dark { Color32::from_rgb(52, 52, 56) } else { Color32::from_rgb(215, 215, 220) };
-        let text_primary = if is_dark { Color32::from_rgb(245, 245, 248) } else { Color32::from_rgb(20, 20, 25) };
-        let text_muted = if is_dark { Color32::from_rgb(150, 150, 160) } else { Color32::from_rgb(105, 105, 115) };
-        let fill = self.app.accent.map_or(DEFAULT_ACCENT, |[r, g, b]| Color32::from_rgb(r, g, b));
-        let on_fill = ink_on(fill);
+        let pal = Palette::new(ctx, self.app);
+        let Palette { is_dark, card_bg, border_color, text_primary, text_muted, fill, on_fill } = pal;
 
         egui::Area::new(egui::Id::unique("craft_update.startup_prompt"))
             .anchor(Align2::CENTER_CENTER, Vec2::ZERO)
@@ -75,65 +66,11 @@ impl StartupPrompt {
                     .inner_margin(egui::Margin::symmetric(20, 18))
                     .show(ui, |ui| {
                         ui.set_width(400.0);
-                        // The host app's widget style isn't ours to rely on (a light theme's hover can be
-                        // dark under this card's dark text), so the prompt's buttons get their own states.
-                        let widgets = &mut ui.visuals_mut().widgets;
-                        let (hover_bg, press_bg) = button_states(is_dark);
-                        for (state, bg) in [(&mut widgets.inactive, card_bg), (&mut widgets.hovered, hover_bg), (&mut widgets.active, press_bg)] {
-                            state.weak_bg_fill = bg;
-                            state.bg_fill = bg;
-                            state.bg_stroke = egui::Stroke::new(1.0, border_color);
+                        style_card(ui, &pal);
+                        let version_line = format!("v{} to {}", self.running_version, self.release.version_label());
+                        if card_header(ui, self.app, &pal, true, &version_line) {
+                            response = StartupPromptResponse::Later;
                         }
-                        // egui draws a focused button (and a pressed one) in the active state: its border is
-                        // the focus ring, in the body text colour so it shows on the card and around a fill.
-                        widgets.active.bg_stroke = egui::Stroke::new(2.0, text_primary);
-                        ui.spacing_mut().item_spacing = Vec2::new(8.0, 6.0);
-
-                        // Header row: app icon (or its initial in a badge) + title + close
-                        ui.horizontal(|ui| {
-                            let (badge_rect, _) = ui.allocate_exact_size(Vec2::new(34.0, 34.0), egui::Sense::hover());
-                            if let Some(icon) = icon_texture(ui.ctx(), self.app) {
-                                let uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
-                                ui.painter().image(icon.id(), badge_rect, uv, Color32::WHITE);
-                            } else {
-                                ui.painter().rect_filled(badge_rect, egui::CornerRadius::ZERO, fill);
-                                let initial = self.app.name.chars().next().map(|c| c.to_string()).unwrap_or_else(|| "A".to_string());
-                                ui.painter().text(badge_rect.center(), Align2::CENTER_CENTER, initial, egui::FontId::monospace(18.0), on_fill);
-                            }
-
-                            ui.add_space(4.0);
-
-                            ui.vertical(|ui| {
-                                ui.spacing_mut().item_spacing.y = 2.0;
-                                ui.horizontal(|ui| {
-                                    ui.label(RichText::new(self.app.name).size(15.0).strong().color(text_primary));
-                                    ui.label(RichText::new(format!("by {}", self.app.developer)).size(11.5).color(text_muted));
-                                    // A chip, not accent-coloured text: small accent text misses WCAG's 4.5:1 for
-                                    // several apps (PdfCraft's red on the dark card, amber on the light one).
-                                    egui::Frame::new().fill(fill).inner_margin(egui::Margin::symmetric(4, 1)).show(ui, |ui| {
-                                        ui.label(RichText::new("UPDATE").size(10.0).monospace().color(on_fill));
-                                    });
-                                });
-                                // ASCII only, like the rest of the card: an app whose fonts lack a glyph may panic
-                                // instead of drawing a box, and this prompt shows up unasked.
-                                let version_pill = format!("v{} to {}", self.running_version, self.release.version_label());
-                                ui.label(RichText::new(version_pill).size(11.0).monospace().color(text_muted));
-                            });
-
-                            ui.with_layout(Layout::right_to_left(Align::Min), |ui| {
-                                // Two strokes, not a "✕" glyph: none of the bundled faces has U+2715.
-                                let (rect, close) = ui.allocate_exact_size(Vec2::splat(18.0), egui::Sense::click());
-                                close.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Close"));
-                                let color = if close.hovered() { text_primary } else { text_muted };
-                                let (center, reach) = (rect.center(), 4.5);
-                                let stroke = egui::Stroke::new(1.5, color);
-                                ui.painter().line_segment([center + Vec2::new(-reach, -reach), center + Vec2::new(reach, reach)], stroke);
-                                ui.painter().line_segment([center + Vec2::new(-reach, reach), center + Vec2::new(reach, -reach)], stroke);
-                                if close.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
-                                    response = StartupPromptResponse::Later;
-                                }
-                            });
-                        });
 
                         ui.add_space(8.0);
 
@@ -232,6 +169,236 @@ impl StartupPrompt {
             self.open = false;
         }
 
+        response
+    }
+}
+
+/// The card's colours for the current theme and app.
+#[derive(Clone, Copy)]
+struct Palette {
+    is_dark: bool,
+    card_bg: Color32,
+    border_color: Color32,
+    text_primary: Color32,
+    text_muted: Color32,
+    /// The app's accent.
+    fill: Color32,
+    /// Text on `fill`.
+    on_fill: Color32,
+}
+
+impl Palette {
+    fn new(ctx: &egui::Context, app: &App) -> Self {
+        let is_dark = ctx.theme() == egui::Theme::Dark;
+        let fill = app.accent.map_or(DEFAULT_ACCENT, |[r, g, b]| Color32::from_rgb(r, g, b));
+        Self {
+            is_dark,
+            card_bg: if is_dark { Color32::from_rgb(26, 26, 28) } else { Color32::from_rgb(255, 255, 255) },
+            border_color: if is_dark { Color32::from_rgb(52, 52, 56) } else { Color32::from_rgb(215, 215, 220) },
+            text_primary: if is_dark { Color32::from_rgb(245, 245, 248) } else { Color32::from_rgb(20, 20, 25) },
+            text_muted: if is_dark { Color32::from_rgb(150, 150, 160) } else { Color32::from_rgb(105, 105, 115) },
+            fill,
+            on_fill: ink_on(fill),
+        }
+    }
+}
+
+/// The dimmed modal backdrop; it senses clicks so they don't reach widgets underneath. True when
+/// it was clicked (a click outside the card).
+fn backdrop(ctx: &egui::Context) -> bool {
+    let screen_rect = ctx.content_rect();
+    egui::Area::new(egui::Id::unique("craft_update_backdrop"))
+        .order(egui::Order::Middle)
+        .fixed_pos(screen_rect.min)
+        .show(ctx, |ui| {
+            let (rect, response) = ui.allocate_exact_size(screen_rect.size(), egui::Sense::click_and_drag());
+            ui.painter().rect_filled(rect, 0.0, Color32::from_black_alpha(150));
+            response.clicked()
+        })
+        .inner
+}
+
+/// The host app's widget style isn't ours to rely on (a light theme's hover can be dark under
+/// this card's dark text), so the card's buttons get their own states.
+fn style_card(ui: &mut egui::Ui, pal: &Palette) {
+    let widgets = &mut ui.visuals_mut().widgets;
+    let (hover_bg, press_bg) = button_states(pal.is_dark);
+    for (state, bg) in [(&mut widgets.inactive, pal.card_bg), (&mut widgets.hovered, hover_bg), (&mut widgets.active, press_bg)] {
+        state.weak_bg_fill = bg;
+        state.bg_fill = bg;
+        state.bg_stroke = egui::Stroke::new(1.0, pal.border_color);
+    }
+    // egui draws a focused button (and a pressed one) in the active state: its border is
+    // the focus ring, in the body text colour so it shows on the card and around a fill.
+    widgets.active.bg_stroke = egui::Stroke::new(2.0, pal.text_primary);
+    ui.spacing_mut().item_spacing = Vec2::new(8.0, 6.0);
+}
+
+/// Header row: app icon (or its initial in a badge), name, developer, `second_line` and a close
+/// button. `update_pill` adds the "UPDATE" chip. True when the close button was clicked.
+fn card_header(ui: &mut egui::Ui, app: &App, pal: &Palette, update_pill: bool, second_line: &str) -> bool {
+    let Palette { text_primary, text_muted, fill, on_fill, .. } = *pal;
+    let mut closed = false;
+    ui.horizontal(|ui| {
+        let (badge_rect, _) = ui.allocate_exact_size(Vec2::new(34.0, 34.0), egui::Sense::hover());
+        if let Some(icon) = icon_texture(ui.ctx(), app) {
+            let uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
+            ui.painter().image(icon.id(), badge_rect, uv, Color32::WHITE);
+        } else {
+            ui.painter().rect_filled(badge_rect, egui::CornerRadius::ZERO, fill);
+            let initial = app.name.chars().next().map(|c| c.to_string()).unwrap_or_else(|| "A".to_string());
+            ui.painter().text(badge_rect.center(), Align2::CENTER_CENTER, initial, egui::FontId::monospace(18.0), on_fill);
+        }
+
+        ui.add_space(4.0);
+
+        ui.vertical(|ui| {
+            ui.spacing_mut().item_spacing.y = 2.0;
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(app.name).size(15.0).strong().color(text_primary));
+                ui.label(RichText::new(format!("by {}", app.developer)).size(11.5).color(text_muted));
+                if update_pill {
+                    // A chip, not accent-coloured text: small accent text misses WCAG's 4.5:1 for
+                    // several apps (PdfCraft's red on the dark card, amber on the light one).
+                    egui::Frame::new().fill(fill).inner_margin(egui::Margin::symmetric(4, 1)).show(ui, |ui| {
+                        ui.label(RichText::new("UPDATE").size(10.0).monospace().color(on_fill));
+                    });
+                }
+            });
+            // ASCII only, like the rest of the card: an app whose fonts lack a glyph may panic
+            // instead of drawing a box, and the startup prompt shows up unasked.
+            ui.label(RichText::new(second_line).size(11.0).monospace().color(text_muted));
+        });
+
+        ui.with_layout(Layout::right_to_left(Align::Min), |ui| {
+            // Two strokes, not a "✕" glyph: none of the bundled faces has U+2715.
+            let (rect, close) = ui.allocate_exact_size(Vec2::splat(18.0), egui::Sense::click());
+            close.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Close"));
+            let color = if close.hovered() { text_primary } else { text_muted };
+            let (center, reach) = (rect.center(), 4.5);
+            let stroke = egui::Stroke::new(1.5, color);
+            ui.painter().line_segment([center + Vec2::new(-reach, -reach), center + Vec2::new(reach, reach)], stroke);
+            ui.painter().line_segment([center + Vec2::new(-reach, reach), center + Vec2::new(reach, -reach)], stroke);
+            if close.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
+                closed = true;
+            }
+        });
+    });
+    closed
+}
+
+/// What the user chose in the result dialog of a manual update check.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CheckResultResponse {
+    /// Dialog is still open and waiting for user input.
+    None,
+    /// OK, the close button, Esc or a click outside: the app stops showing the dialog.
+    Close,
+    /// Failed state only: the app starts another requested check.
+    CheckAgain,
+}
+
+/// The result of a manual "Check for Updates", in the same card as [`StartupPrompt`]: a spinner
+/// while checking, "newest version" when up to date, the error and a retry when it failed.
+///
+/// An app shows it while a requested check is in view: open it when the user starts a check
+/// (`Updater::check_now`), call [`show`](Self::show) every frame with `updater.status()` until it
+/// returns [`CheckResultResponse::Close`], then stop calling it. On
+/// [`CheckResultResponse::CheckAgain`] start another requested check and keep showing it. An
+/// available update goes to [`StartupPrompt`] instead; the app closes this dialog when the prompt opens.
+#[derive(Clone, Copy, Debug)]
+pub struct CheckResultDialog {
+    app: &'static App,
+    running_version: &'static str,
+}
+
+impl CheckResultDialog {
+    /// A dialog for `app`, which is running `running_version`.
+    pub fn new(app: &'static App, running_version: &'static str) -> Self {
+        Self { app, running_version }
+    }
+
+    /// Draws the modal card for `status` and returns what the user chose. [`Status::Idle`] draws
+    /// nothing and returns [`CheckResultResponse::None`].
+    pub fn show(&self, ctx: &egui::Context, status: &Status) -> CheckResultResponse {
+        if matches!(status, Status::Idle) {
+            return CheckResultResponse::None;
+        }
+        let mut response = CheckResultResponse::None;
+        if backdrop(ctx) {
+            response = CheckResultResponse::Close;
+        }
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) {
+            response = CheckResultResponse::Close;
+        }
+
+        let pal = Palette::new(ctx, self.app);
+        let Palette { card_bg, border_color, text_primary, text_muted, fill, on_fill, .. } = pal;
+        egui::Area::new(egui::Id::unique("craft_update.check_result")).anchor(Align2::CENTER_CENTER, Vec2::ZERO).order(egui::Order::Foreground).show(
+            ctx,
+            |ui| {
+                egui::Frame::new()
+                    .fill(card_bg)
+                    .stroke(egui::Stroke::new(1.0, border_color))
+                    .corner_radius(egui::CornerRadius::ZERO)
+                    .inner_margin(egui::Margin::symmetric(20, 18))
+                    .show(ui, |ui| {
+                        ui.set_width(400.0);
+                        style_card(ui, &pal);
+                        if card_header(ui, self.app, &pal, false, &format!("v{}", self.running_version)) {
+                            response = CheckResultResponse::Close;
+                        }
+                        ui.add_space(8.0);
+
+                        match status {
+                            Status::Checking => {
+                                ui.horizontal(|ui| {
+                                    ui.spinner();
+                                    ui.label(RichText::new("Checking for updates…").size(12.5).color(text_primary));
+                                });
+                            }
+                            Status::UpToDate => {
+                                let text = format!("{} {} is the newest version available.", self.app.name, self.running_version);
+                                ui.label(RichText::new(text).size(12.5).color(text_muted));
+                            }
+                            Status::Failed(error) => {
+                                let alert_color = Color32::from_rgb(225, 95, 30);
+                                ui.label(RichText::new("Could not check for updates.").size(12.5).strong().color(alert_color));
+                                ui.add(egui::Label::new(RichText::new(error).size(12.0).color(text_muted)).selectable(true));
+                                ui.label(
+                                    RichText::new(format!("All releases are listed at {}", self.app.releases_url())).size(11.5).color(text_muted),
+                                );
+                            }
+                            Status::Idle => {}
+                        }
+
+                        if !matches!(status, Status::Checking) {
+                            ui.add_space(10.0);
+                            let (hairline_rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 1.0), egui::Sense::hover());
+                            ui.painter().hline(hairline_rect.x_range(), hairline_rect.top(), egui::Stroke::new(1.0, border_color));
+                            ui.add_space(8.0);
+                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                ui.set_min_height(26.0);
+                                let ok = egui::Button::new(RichText::new("OK").size(10.5).strong().monospace().color(on_fill))
+                                    .fill(fill)
+                                    .corner_radius(egui::CornerRadius::ZERO)
+                                    .min_size(Vec2::new(65.0, 26.0));
+                                if ui.add(ok).clicked() {
+                                    response = CheckResultResponse::Close;
+                                }
+                                if matches!(status, Status::Failed(_)) {
+                                    let again = egui::Button::new(RichText::new("CHECK AGAIN").size(10.5).monospace().color(text_primary))
+                                        .corner_radius(egui::CornerRadius::ZERO)
+                                        .min_size(Vec2::new(100.0, 26.0));
+                                    if ui.add(again).clicked() {
+                                        response = CheckResultResponse::CheckAgain;
+                                    }
+                                }
+                            });
+                        }
+                    });
+            },
+        );
         response
     }
 }
@@ -734,5 +901,41 @@ mod tests {
         assert!(!prompt.open);
         assert!(output.shapes.is_empty(), "closed prompt painted {} shapes", output.shapes.len());
         assert!(painted_text(&output).is_empty());
+    }
+
+    #[test]
+    fn check_result_paints_each_state_and_escape_closes() {
+        let dialog = CheckResultDialog::new(&PHOTOCRAFT, "0.1.0");
+        let run = |ctx: &Context, status: &Status, events: Vec<Event>| {
+            // The first frame of an area only sizes it; the second paints.
+            let mut frames = [Vec::new(), events].into_iter().map(|events| {
+                let mut response = CheckResultResponse::None;
+                let mut output = ctx.run_ui(RawInput { screen_rect: Some(screen()), events, ..RawInput::default() }, |ui| {
+                    response = dialog.show(ui.ctx(), status);
+                });
+                output.textures_delta.clear();
+                (response, output)
+            });
+            frames.next();
+            frames.next().unwrap()
+        };
+        let ctx = dark_context();
+        let (_, checking) = run(&ctx, &Status::Checking, Vec::new());
+        assert!(painted_text(&checking).contains("Checking for updates…"));
+        assert!(!painted_text(&checking).contains("UPDATE"), "no update pill on a result");
+        let (_, up_to_date) = run(&ctx, &Status::UpToDate, Vec::new());
+        let text = painted_text(&up_to_date);
+        assert!(text.contains("PhotoCraft 0.1.0 is the newest version available.") && text.contains("OK"), "{text}");
+        let (response, failed) = run(&ctx, &Status::Failed("no network".into()), Vec::new());
+        let text = painted_text(&failed);
+        for want in ["Could not check for updates.", "no network", "All releases are listed at https://github.com/", "CHECK AGAIN", "OK"] {
+            assert!(text.contains(want), "{want} missing in {text}");
+        }
+        assert_eq!(response, CheckResultResponse::None);
+        let (_, idle) = run(&ctx, &Status::Idle, Vec::new());
+        assert!(painted_text(&idle).is_empty());
+
+        let escape = Event::Key { key: Key::Escape, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE };
+        assert_eq!(run(&dark_context(), &Status::UpToDate, vec![escape]).0, CheckResultResponse::Close);
     }
 }
