@@ -7,36 +7,20 @@ produced in LightCraft (`clean-room/crw/`, branch `clean-room-crw-format-decode`
 not rewritten after the fact, so paths they mention are LightCraft's paths of that time (the
 mapping is below).
 
-The derivation trail — the starting assumptions, the plan, the container notes, the
-entropy-derivation log, the chart calibration, the probe scripts and their observational logs — is
-not part of this record. What this record holds is what the decoder is built from and what a
-reviewer needs to check it: the frozen format, its verification, the payload-layout and colour
-notes, the private-corpus record, the source log and the frozen code tables. Those documents are
-renumbered `01`–`05` in reading order.
+The derivation trail and frozen table-generation materials remain in
+[LightCraft PR #3021](https://github.com/storytold/lightcraft/pull/3021). This crate retains the
+format specification, verification summary, colour metadata notes, source log and public-facing
+decoder documentation.
 
 ## Documents
 
 | File | What it is |
 |---|---|
 | [`sources.md`](sources.md) | Every URL opened and search run, with the time, what was asked and what was taken. The rules in force are at its top. |
-| [`01-payload-layout.md`](01-payload-layout.md) | The RawData payload partition established by statistics alone (no decoding): low-bits plane, 514-byte header, ff00-stuffed stream, tail. |
 | [`02-crw-format.md`](02-crw-format.md) | **The frozen format** (revision 2) and its reopening rule. The decoder implements this document. |
 | [`03-verification.md`](03-verification.md) | Full-frame exact comparison against the reference, zero tuning: 28 of 29 files, then 1,516 of 1,516 D60 files. |
 | [`04-color.md`](04-color.md) | CFA phase, active area, black and white levels, white-balance records, orientation and time: what the decoder reports beyond the samples. §3's colour matrices concern LightCraft (below). |
-| [`05-private-corpus.md`](05-private-corpus.md) | The maintainer's EOS D60 files and controlled captures (grey card, lens cap, white-balance presets) and what each set established. |
-
-## Tables and logs
-
-- `logs/table_sel{0,1,2}.json`: **the frozen code tables**, the source of truth that
-  `tools/gen_tables.py` renders into `../src/tables.rs`. `table_sel0_d60class.json` is the
-  revision-1 selector-0 table, kept for the record. These are the frozen code-table logs that ship
-  with the crate: without them the frozen tables cannot be regenerated or audited.
-- `logs/private-corpus.tsv`: names, sizes and SHA-256 of the maintainer's own files. No image
-  content, metadata or thumbnails are recorded anywhere here.
-- `logs/private/` (gitignored): per-file dumps of the private files, which can hold personal
-  metadata. Local only.
-- The probe scripts and their observational logs (`structure-*.txt`, `p1*.txt`,
-  `verification-sweep.txt`, `chart-captures.tsv`) are not part of this record.
+| [`05-private-corpus.md`](05-private-corpus.md) | A summary of private-corpus decoder verification; no image data or identifying file list is included. |
 
 ## What stayed local
 
@@ -60,7 +44,7 @@ renumbered `01`–`05` in reading order.
 | `crates/raw/tests/crw_oracle.rs` | `crates/crw/tests/samples.rs` (`CRAFT_CRW_ORACLE`, formerly `LIGHTCRAFT_CRW_ORACLE`) |
 | `white_from_data` (LightCraft's shared estimate) | `saturation_plateau` in `crates/crw/src/lib.rs` |
 | `xtask/src/main.rs` `RAW_SAMPLES` (corpus URLs) | `crates/crw/tests/samples.json` + `scripts/fetch-crw-samples.py` |
-| `plan/crw/model/gen_tables.py` | `crates/crw/clean-room/tools/gen_tables.py` |
+| `plan/crw/model/gen_tables.py` | LightCraft PR #3021 |
 | `docs/arw6-compression.md` (the house model for a derivation) | LightCraft's document; the method is summarised in `docs/clean-room.md` of this repository |
 | `crates/raw/src/chart_table.rs`, `spectral_table.rs`, `camera_preview`, `assets/camera-profiles/` | LightCraft (colour stays in the app) |
 

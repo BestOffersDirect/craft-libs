@@ -11,7 +11,7 @@ derivation log (not part of this record) and re-verified in `03-verification.md`
 (§3). Nothing else in the model changed, and every file of the first corpus still verifies. Everything here was derived from the CC0/private sample files
 and black-box probing of LibRaw 0.22.2 (`unprocessed_raw.exe`), per the approved plan; no
 decoder source was consulted. The chronological evidence is the derivation log, which is not part
-of this record; the payload groundwork is `01-payload-layout.md`.
+of this record; the initial payload-layout analysis remains in LightCraft PR #3021.
 
 ## 1 Payload layout
 
@@ -72,9 +72,9 @@ After removing the stuffing (drop the 0x00 after every 0xff), bits are read
 
 Extracted from the samples by known-plaintext alignment and frozen as data:
 
-- Selector 0: `logs/table_sel0.json` — 12 first-table + 162 second-table codes.
-- Selector 1: `logs/table_sel1.json` — 12 + 162.
-- Selector 2: `logs/table_sel2.json` — 12 + 162.
+- Selector 0: frozen code tables — 12 first-table + 162 second-table codes.
+- Selector 1: frozen code tables — 12 + 162.
+- Selector 2: frozen code tables — 12 + 162.
 
 Each second table now holds all 162 symbols: (r, s) for r = 0..15, s = 1..10, plus (0, 0)
 and (15, 0). Revision 1 lacked (7..14, 10) in selector 0 and (14, 10) in selector 1: runs

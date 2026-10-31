@@ -94,7 +94,7 @@ checked out, diffed, logged or read.
 - 2026-10-12 19:35–19:45 — `ciff_dump.py` (written here, stdlib only; container layout
   implemented from the two documented sources above) run over the 11 public files and the 18
   private files (whose dumps may contain personal metadata and are never committed). Observed
-  facts are summarised in `01-payload-layout.md`. No raw-data decoding was attempted; statistics
+  facts are summarised in the LightCraft derivation record. No raw-data decoding was attempted; statistics
   only. The script and its logs are not part of this record.
 - 2026-10-12 ~20:0x — P0/P1 local analysis (post-approval): the container notes written from the
   already-logged sources + corpus observations. `p1_payload.py`, `p1b_markers.py`,
@@ -102,7 +102,7 @@ checked out, diffed, logged or read.
   three payload layouts, the
   514-byte zero block at the compressed section start of every file, JPEG-style ff00 stuffing
   of every entropy stream (zero exceptions), the PowerShot `ff d9` terminator, and the exact
-  low-bits region bounds on G5/G6. Documented in `01-payload-layout.md`. No external sources
+  low-bits region bounds on G5/G6. Documented in the LightCraft derivation record. No external sources
   consulted in this step.
 
 ## Oracle (P2, from 2026-10-12)
